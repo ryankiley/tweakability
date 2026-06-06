@@ -1,0 +1,20 @@
+{
+  "name": "tweakability",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "A dependency-free, code-split real-time parameter panel — sliders, toggles, a wide-gamut OKLCH colour picker, curve editors and more, from a plain schema.",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node build.mjs && python3 -m http.server 4330 --directory dist"
+  },
+  "exports": {
+    ".": "./dist/tweaks.js",
+    "./core": "./dist/tweaks/core.js",
+    "./css": "./dist/tweaks.css"
+  },
+  "files": ["dist", "src"],
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}
