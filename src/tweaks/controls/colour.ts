@@ -14,7 +14,7 @@ import { oklchGamutProbe, oklchToHex, hexToOklch, channelValues, withChannel, ga
 // colours render true, not clamped to muddy sRGB). A solid sRGB line sits inside;
 // a dashed P3 line rides the displayable edge. ──
 const WIDE_CANVAS = (() => { try { return document.createElement("canvas").getContext("2d", { colorSpace: "display-p3" })?.getContextAttributes?.().colorSpace === "display-p3"; } catch { return false; } })();
-const CANVAS_CS = WIDE_CANVAS ? { colorSpace: "display-p3" } : {};
+const CANVAS_CS: any = WIDE_CANVAS ? { colorSpace: "display-p3" } : {}; // any: colorSpace is a runtime-feature-detected string, looser than the DOM lib's PredefinedColorSpace
 const ENGINE_GAMUT = WIDE_CANVAS ? "p3" : "srgb"; // working gamut for the rasterised pixels
 const sampleCurve = (curve, t) => { const last = curve.length - 1, pos = Math.max(0, Math.min(last, t * last)), i = Math.floor(pos), f = pos - i; return curve[i] * (1 - f) + curve[Math.min(i + 1, last)] * f; };
 const chromaCeil = (probe, L, hi = 0.5) => { if (!probe(L, 0)) return 0; let lo = 0; for (let k = 0; k < 16; k++) { const m = (lo + hi) / 2; probe(L, m) ? (lo = m) : (hi = m); } return lo; };
@@ -47,7 +47,7 @@ function parseColor(str) {
   // returns "#rrggbb" (opaque) or "rgba(r,g,b,a)" for sRGB-family colours, then parse
   // that. (oklch/oklab are handled above by regex precisely because a canvas/computed
   // probe can't be trusted to round-trip CSS Color 4 spaces in every browser.)
-  const c2d = (parseColor._c2d ||= document.createElement("canvas").getContext("2d"));
+  const c2d = ((parseColor as any)._c2d ||= document.createElement("canvas").getContext("2d"));
   c2d.fillStyle = "#000"; c2d.fillStyle = str;
   const norm = c2d.fillStyle;
   if (norm[0] === "#") return parseColor(norm); // opaque → the hex branch above
@@ -90,7 +90,7 @@ function createColor(meta, onChange) {
   pop.append(area, hueBar, alphaBar, modeRow, channels);
   root.append(trigger, pop);
 
-  const actx = areaCanvas.getContext("2d", CANVAS_CS);
+  const actx = areaCanvas.getContext("2d", CANVAS_CS) as CanvasRenderingContext2D;
   const hctx = hueCanvas.getContext("2d");
 
   const renderArea = () => {
@@ -101,7 +101,7 @@ function createColor(meta, onChange) {
     const backingW = Math.round(cssW * dpr), backingH = Math.round(cssH * dpr);
     const W = Math.max(1, Math.round(backingW / 4)), Hh = Math.max(1, Math.round(backingH / 4)); // gradient rasterised at 1/4 res
     const off = document.createElement("canvas"); off.width = W; off.height = Hh;
-    const octx = off.getContext("2d", CANVAS_CS); const data = new Uint8ClampedArray(W * Hh * 4);
+    const octx = off.getContext("2d", CANVAS_CS) as CanvasRenderingContext2D; const data = new Uint8ClampedArray(W * Hh * 4);
     const invH = Hh > 1 ? 1 / (Hh - 1) : 0, invW = W > 1 ? 1 / (W - 1) : 0;
     for (let y = 0; y < Hh; y++) { const Lp = 1 - y * invH, rowMax = sampleCurve(curve, Lp); for (let x = 0; x < W; x++) { const rgb = convert([Lp, x * invW * rowMax, H], "oklch", ENGINE_GAMUT); const o = (y * W + x) * 4; data[o] = Math.round(clamp(rgb[0], 0, 1) * 255); data[o + 1] = Math.round(clamp(rgb[1], 0, 1) * 255); data[o + 2] = Math.round(clamp(rgb[2], 0, 1) * 255); data[o + 3] = 255; } }
     octx.putImageData(new ImageData(data, W, Hh, CANVAS_CS), 0, 0);

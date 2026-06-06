@@ -18,12 +18,18 @@ import {
   wireHoverClass, fuzzyMatch, setRadioActive, radioButton, attachScrub, ICON_GRIP,
   REGISTRY, registerControl, getControl,
 } from "./shared.js";
+import type { Schema, TweaksOptions, Panel, Params } from "./types.js";
 
 // ── Lazy controls — each maps to a dynamic import of its module, which registers
 // its constructor(s) into the shared registry on load. ensure() kicks the import
 // (deduped); scanTypes walks a schema (into folders + tabs pages) for the lazy
 // types it uses, so the panel can preload them before it assembles.
-const LAZY_IMPORT = /* @tw-split-only */ {
+// TW_SPLIT is an esbuild `define`: `true` for the code-split build (each control loads
+// on demand via these dynamic imports), `false` for the single-file bundle — where
+// single.ts statically imports every control so they self-register, leaving this map
+// empty so esbuild drops the import()s and the whole kit inlines, synchronous.
+declare const TW_SPLIT: boolean;
+const LAZY_IMPORT: Record<string, () => Promise<unknown>> = TW_SPLIT ? {
   interval: () => import("./controls/interval.js"),
   color: () => import("./controls/colour.js"),
   gradient: () => import("./controls/gradient.js"),
@@ -35,7 +41,7 @@ const LAZY_IMPORT = /* @tw-split-only */ {
   bezier: () => import("./controls/bezier.js"),
   point: () => import("./controls/point.js"),
   plot: () => import("./controls/plot.js"),
-} /* @tw-split-end */;
+} : {};
 const loading = {};
 const ensure = (type) => (getControl(type) || !LAZY_IMPORT[type]) ? null : (loading[type] ||= LAZY_IMPORT[type]());
 const scanTypes = (metas, set = new Set()) => {
@@ -605,7 +611,7 @@ function showToast(msg) {
   const toast = document.querySelector(".toast");
   if (!toast) return;
   toast.textContent = msg; toast.classList.add("show");
-  clearTimeout(showToast._t); showToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
+  clearTimeout((showToast as any)._t); (showToast as any)._t = setTimeout(() => toast.classList.remove("show"), 2200);
 }
 // Hint tooltip — one shared, portaled bubble shown by a control's info marker on
 // hover/focus. Portaled to <body> so it clears the panel's overflow clip; sits
@@ -626,7 +632,7 @@ function hideHint() { if (hintTip) hintTimer = setTimeout(() => hintTip.classLis
 // A control's `hint` becomes a visible ⓘ marker beside its label that reveals the
 // text in the tooltip on hover/focus — discoverable and keyboard-reachable, unlike
 // the old native `title`. Shared by the panel build (registerCond) and enhance().
-function addHintMarker(node, hint, themeVars) {
+function addHintMarker(node: any, hint: string, themeVars?: any) {
   const label = node.querySelector(".tw-slider-label, .tw-row-label, .tw-select-label, .tw-color-label, .tw-radiogrid-label, .tw-field-label, .tw-folder-title, .tw-fps-label, .tw-plot-label") || node;
   const mark = el("button", "tw-hint", ICON_INFO); mark.type = "button"; mark.setAttribute("aria-label", hint);
   const show = () => showHint(mark, hint, themeVars);
@@ -662,15 +668,15 @@ registerControl("string", createString);
 registerControl("number", createNumber);
 registerControl("folder", createFolder);
 
-export function tweaks(name, schema, opts = {}) {
+export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): Panel {
   const metas = Object.entries(schema).map(([k, v]) => metaFor(k, v)).filter(Boolean);
-  const params = {};
+  const params: Params = {};
   const entries = []; // { target, key, set, get, def, path } — flattened across folders, for reset + persist
-  const listeners = new Set();
+  const listeners = new Set<(p?: any, last?: any) => void>();
   let persist = () => {}; // reassigned below when opts.persist is set (debounced localStorage save)
   // Assigned by assemble() below. Declared here so the API returned synchronously can
   // forward to them even on the lazy path, where assemble() runs after modules load.
-  let listPresets = () => ({}), savePreset = () => false, loadPreset = () => false, deletePreset = () => {};
+  let listPresets: () => Record<string, any> = () => ({}), savePreset: (nm?: string) => boolean = () => false, loadPreset: (nm?: string) => boolean = () => false, deletePreset: (nm?: string) => void = () => {};
   let undo = () => {}, redo = () => {};
   // Each listener runs isolated: a throwing on() callback (or internal listener)
   // can't break the others, skip persist(), or bubble back out through set().
@@ -1000,7 +1006,7 @@ export function tweaks(name, schema, opts = {}) {
   // The API is built + returned synchronously. on/set/reset/setTheme operate on the
   // shell (live immediately); the presets + undo methods forward to bindings assemble()
   // fills in (no-ops until then — only reachable on the lazy path, before ready).
-  const api = {
+  const api: any = {
     el: panel, params,
     on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     set(key, v) { const e = entries.find((x) => x.target === params && x.key === key); if (e) { e.set(v); params[key] = e.get(); } else params[key] = v; notify(); },
@@ -1018,7 +1024,7 @@ export function tweaks(name, schema, opts = {}) {
   const pending = ensureForMetas(metas);
   if (pending) { api.ready = panel.ready = pending.then(assemble).then(() => api); }
   else { assemble(); api.ready = panel.ready = Promise.resolve(api); }
-  return api;
+  return api as Panel;
 }
 
 // ── Markup-driven enhancement (the showcase: minimal [data-tw] hosts → live control) ──
@@ -1057,7 +1063,7 @@ const dataMeta = (host) => {
   }
   return null;
 };
-export async function enhance(root = document) {
+export async function enhance(root: Document | Element = document): Promise<void> {
   // Static showcase panels collapse like the real one: wrap the controls in a
   // .tw-body and turn the header title into a collapse toggle (Tweakpane-style).
   // Panels built by tweaks() already nest controls in .tw-body, so they're skipped.
@@ -1067,7 +1073,7 @@ export async function enhance(root = document) {
     if (!header || !controls) return;
     panel.setAttribute("data-tw-panel-bound", "");
     const body = el("div", "tw-body"); panel.insertBefore(body, controls); body.append(controls);
-    let btn = header.querySelector(".tw-header-toggle");
+    let btn: any = header.querySelector(".tw-header-toggle");
     const title = header.querySelector(".tw-title");
     if (!btn && title) { btn = el("button", "tw-header-toggle"); btn.type = "button"; title.replaceWith(btn); btn.append(title); }
     if (!btn) return;
@@ -1082,7 +1088,7 @@ export async function enhance(root = document) {
       const copyBtn = makeCopyBtn();
       const resetBtn = makeResetBtn();
       toolbar.append(copyBtn, resetBtn); header.append(toolbar);
-      const live = () => [...panel.querySelectorAll("[data-tw]")].map((h) => h._tw).filter((t) => t && t.ctrl.get() !== undefined);
+      const live = () => [...panel.querySelectorAll("[data-tw]")].map((h: any) => h._tw).filter((t: any) => t && t.ctrl.get() !== undefined);
       copyBtn.addEventListener("click", async () => {
         const vals = {}; for (const t of live()) vals[t.key] = t.ctrl.get();
         const ok = await copyText(JSON.stringify(vals, null, 2));
@@ -1096,7 +1102,7 @@ export async function enhance(root = document) {
     }
   });
   // Folders first: build the collapsible chrome and move child [data-tw] hosts into it.
-  root.querySelectorAll('[data-tw="folder"]:not([data-tw-bound])').forEach((host) => {
+  root.querySelectorAll('[data-tw="folder"]:not([data-tw-bound])').forEach((host: any) => {
     host.setAttribute("data-tw-bound", "");
     const f = createFolder({ label: host.dataset.label || "Folder" });
     [...host.children].forEach((c) => f.body.append(c));
@@ -1106,7 +1112,7 @@ export async function enhance(root = document) {
   // load any lazy modules they need, then build. Markup enhancement is fire-and-forget,
   // so awaiting here is fine — a lazy control simply pops in once its chunk resolves.
   const hosts = [...root.querySelectorAll("[data-tw]:not([data-tw-bound])")]
-    .map((h) => ({ host: h, meta: dataMeta(h) }))
+    .map((h: any) => ({ host: h, meta: dataMeta(h) }))
     .filter((x) => x.meta);
   hosts.forEach(({ host }) => host.setAttribute("data-tw-bound", ""));
   const pend = ensureForMetas(hosts.map((x) => x.meta));

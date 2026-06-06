@@ -8,13 +8,18 @@
     "build": "node build.mjs",
     "serve": "node build.mjs && python3 -m http.server 4330 --directory dist"
   },
+  "types": "./dist/types/tweaks/single.d.ts",
   "exports": {
-    ".": "./dist/tweaks.js",
-    "./core": "./dist/tweaks/core.js",
+    ".": { "types": "./dist/types/tweaks/single.d.ts", "import": "./dist/tweaks.js" },
+    "./core": { "types": "./dist/types/tweaks/core.d.ts", "import": "./dist/tweaks/core.js" },
     "./css": "./dist/tweaks.css"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
   }
 }

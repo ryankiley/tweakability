@@ -38,8 +38,11 @@ const optValue = (o) => (o == null ? undefined : typeof o === "string" ? o : o.v
 const optLabel = (o) => (typeof o === "string" ? titleCase(o) : o.label);
 
 const svgNS = "http://www.w3.org/2000/svg";
-const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
-const svgEl = (tag, cls) => { const n = document.createElementNS(svgNS, tag); if (cls) n.setAttribute("class", cls); return n; };
+// el/svgEl return `any` on purpose: they're the internal DOM factory, used as div /
+// input / canvas / svg interchangeably across the kit. The public API (types.ts) is
+// fully typed; internal DOM typing is intentionally loose (tighten incrementally).
+const el = (tag: string, cls?: string, html?: string): any => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+const svgEl = (tag: string, cls?: string): any => { const n = document.createElementNS(svgNS, tag); if (cls) n.setAttribute("class", cls); return n; };
 // A resolved custom property off a node; accentColor picks the panel accent and
 // falls back to the primary text colour then white (canvas strokes need a literal).
 const cssVar = (node, name) => getComputedStyle(node).getPropertyValue(name).trim();
@@ -61,7 +64,7 @@ const wireHoverClass = (el, onEnter) => {
 // (buttons===0), then onEnd runs. The shape behind the colour plane/strips, the
 // point pad, and the bezier handles — the controls with bespoke physics (slider,
 // number scrub, gradient) keep their own loops.
-function dragGesture(node, { onDown, onMove, onEnd } = {}) {
+function dragGesture(node: any, { onDown, onMove, onEnd }: { onDown?: (e: any) => void; onMove?: (e: any) => void; onEnd?: (e: any) => void } = {}) {
   let active = false;
   const end = (e) => { if (!active) return; active = false; onEnd && onEnd(e); };
   node.addEventListener("pointerdown", (e) => { active = true; try { node.setPointerCapture(e.pointerId); } catch {} onDown && onDown(e); });
@@ -83,7 +86,7 @@ const fitCanvas = (canvas, ctx, maxDpr = Infinity) => {
 // Place a portaled popover under its trigger — flipping above when it won't fit below —
 // clamped into the viewport. width:"match" sizes it to the trigger; a number is the
 // fallback width to use before layout. Shared by the select dropdown + colour picker.
-const placeBelow = (trigger, pop, { width, fallbackH = 300, gap = 6 } = {}) => {
+const placeBelow = (trigger: any, pop: any, { width, fallbackH = 300, gap = 6 }: { width?: number | "match"; fallbackH?: number; gap?: number } = {}) => {
   const r = trigger.getBoundingClientRect();
   if (width === "match") pop.style.width = r.width + "px";
   const w = width === "match" ? r.width : (pop.offsetWidth || width || 0);
