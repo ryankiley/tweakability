@@ -332,9 +332,15 @@
  * small set of short presets (sizes, percentages, ratios) that won't fit inline
  * on one row. Transparent cells with a highlight on the active one — the
  * Segmented idiom, gridded; labels are kept terse so the cells stay tidy. ── */
+/* The grid sits in a surface container like every other control (the row idiom): 12px
+ * left for the label, a 4px frame round the cells (matching their gaps + the toggle /
+ * button-group inset). A single-row grid is 24px cell + 8px frame = the 32px row height;
+ * extra rows stack below. The cells are transparent (the container is the surface), with
+ * the active one highlighted — the segmented idiom this control was always meant to be. */
 .tw-radiogrid {
   display: flex; align-items: center; gap: 10px;
-  min-height: var(--tw-row-height); padding: 0 0 0 12px;
+  min-height: var(--tw-row-height); padding: 4px 4px 4px 12px;
+  background: var(--tw-surface); border-radius: var(--tw-radius);
 }
 .tw-radiogrid-label {
   flex-shrink: 1; min-width: 0;
@@ -348,7 +354,7 @@
 .tw-radiogrid-btn {
   font: inherit; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums;
   padding: 5px 4px; text-align: center; /* 5px verticals → the 24px pill height shared by the segmented / tabs / button-group cells */
-  color: var(--tw-text-label); background: var(--tw-surface);
+  color: var(--tw-text-label); background: transparent; /* transparent — the container carries the surface, the cell highlights only when hovered/active */
   border: none; border-radius: 6px;
   cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.2s var(--tw-ease-pop);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
