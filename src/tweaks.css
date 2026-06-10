@@ -347,7 +347,7 @@
 }
 .tw-radiogrid-btn {
   font: inherit; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums;
-  padding: 6px 4px; text-align: center;
+  padding: 5px 4px; text-align: center; /* 5px verticals → the 24px pill height shared by the segmented / tabs / button-group cells */
   color: var(--tw-text-label); background: var(--tw-surface);
   border: none; border-radius: 6px;
   cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.2s var(--tw-ease-pop);
@@ -517,6 +517,7 @@
 .tw-color-mode-row { display: flex; align-items: center; gap: 8px; }
 .tw-color-mode { appearance: none; -webkit-appearance: none; font: inherit; font-size: 12px; font-weight: 500; color: var(--tw-text-primary); background-color: var(--tw-surface); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; border: 1px solid var(--tw-border); border-radius: 6px; padding: 4px 26px 4px 10px; cursor: pointer; outline: none; } /* right 6px: the bg chevron's 4px side-bearing then clears the edge by ~10px, matching the 10px text inset on the left */
 .tw-color-mode:hover { background-color: var(--tw-surface-hover); }
+.tw-color-mode:focus-visible { border-color: var(--tw-border-hover); } /* match the channel inputs' focus cue (the native select had none) */
 .tw-color-gamut--pop { margin-left: auto; font-size: 12px; } /* match the mode select beside it */
 .tw-color-channels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .tw-color-channels--hex { grid-template-columns: 1fr; }
@@ -621,7 +622,7 @@
 /* ── FPS graph (monitor blade) ── */
 .tw-fps {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px;
-  background: var(--tw-surface); border-radius: var(--tw-radius); padding: 8px 10px 10px;
+  background: var(--tw-surface); border-radius: var(--tw-radius); padding: 8px 10px 10px 12px; /* 12px left lands the label on the same gridline as every other control label (the row idiom: 12 left / 10 right) */
 }
 .tw-fps-label { font-size: 12px; font-weight: 500; color: var(--tw-text-label); }
 .tw-fps-val { font-family: var(--tw-font-sans); font-size: 12px; color: var(--tw-text-primary); text-align: right; }
@@ -684,12 +685,14 @@
 .tw-pad.is-grabbing .tw-pad-thumb { transform: translate(-50%, -50%) scale(1.28); box-shadow: 0 0 0 1px var(--tw-border-hover), 0 3px 9px rgba(0, 0, 0, 0.4); }
 .tw-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .tw-field-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; color: var(--tw-text-tertiary); text-transform: uppercase; }
-.tw-field .tw-num-wrap { background: var(--tw-base); border: 1px solid var(--tw-border); border-radius: 6px; padding: 3px 4px; gap: 2px; }
+.tw-field .tw-num-wrap { background: var(--tw-base); border: 1px solid var(--tw-border); border-radius: 6px; padding: 3px 4px; gap: 2px; transition: border-color 0.15s; }
+/* Focused field lifts its border — the same cue the plot field + colour channels give, now on Spring / Point / Bezier / colour-channel fields too. */
+.tw-field .tw-num-wrap:focus-within { border-color: var(--tw-border-hover); }
 .tw-field .tw-num { flex: 1; width: auto; min-width: 0; }
 .tw-field .tw-num-grab { width: 10px; }
 
 /* ── Knob / dial — a rotary value control (drag to turn, wheel/arrows to nudge) ── */
-.tw-knob { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; background: var(--tw-surface); border-radius: var(--tw-radius); }
+.tw-knob { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; background: var(--tw-surface); border-radius: var(--tw-radius); } /* 8px to match the spring block — the kit's other viz-over-controls panel */
 .tw-knob-dial { position: relative; width: 88px; height: 88px; cursor: ns-resize; touch-action: none; outline: none; border-radius: 999px; }
 /* The whole dial lifts a touch while you turn it — the slider handle's "weight on press". */
 .tw-knob-svg { width: 100%; height: 100%; display: block; overflow: visible; transition: transform 0.2s var(--tw-ease-spring); }
@@ -700,7 +703,7 @@
  * rides bright while turning — mirroring the slider handle's reveal. */
 .tw-knob-dot { fill: var(--tw-text-primary); stroke: var(--tw-base); stroke-width: 2; opacity: 0; transition: opacity 0.18s; }
 .tw-knob-dial:hover .tw-knob-dot, .tw-knob-dial:focus-visible .tw-knob-dot, .tw-knob-dial.is-active .tw-knob-dot { opacity: 1; }
-.tw-knob-readout { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; font-family: var(--tw-font-sans); color: var(--tw-text-primary); pointer-events: none; transition: color 0.15s; }
+.tw-knob-readout { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; font-family: var(--tw-font-sans); color: var(--tw-text-primary); pointer-events: none; transition: color 0.15s; }
 .tw-knob-dial.is-active .tw-knob-readout { color: var(--tw-text-focus); }
 .tw-knob-label { font-size: 12px; font-weight: 500; color: var(--tw-text-label); }
 .tw-knob-dial:focus-visible { box-shadow: 0 0 0 2px var(--tw-accent, var(--tw-text-focus)); }
@@ -714,7 +717,7 @@
 .tw-bezier-ctl { stroke: var(--tw-text-tertiary); stroke-width: 1.5; }
 .tw-bezier-curve { fill: none; stroke: var(--tw-accent, var(--tw-text-primary)); stroke-width: 2; stroke-linecap: round; }
 .tw-bezier-handle {
-  position: absolute; width: 13px; height: 13px; margin: 0; padding: 0;
+  position: absolute; width: 14px; height: 14px; margin: 0; padding: 0; /* 14px = the colour-area + point-pad circular drag handles, so every 2D-plane thumb is one size */
   transform: translate(-50%, -50%); border-radius: 999px;
   background: var(--tw-text-primary); border: 2px solid var(--tw-base);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); cursor: grab; touch-action: none;
@@ -727,12 +730,12 @@
 
 /* Plot — a function graph with an editable, safely-parsed expression. */
 .tw-plot { display: flex; flex-direction: column; gap: 6px; }
-.tw-plot-label { font-size: 12px; font-weight: 500; color: var(--tw-text-label); padding: 0 2px; }
+.tw-plot-label { font-size: 12px; font-weight: 500; color: var(--tw-text-label); padding: 0 12px; } /* 12px left → caption on the shared label gridline, over the full-width graph (the slider's label-over-track idiom) */
 .tw-plot-graph { position: relative; width: 100%; height: 140px; background: var(--tw-surface); border-radius: var(--tw-radius); overflow: hidden; box-shadow: inset 0 0 0 1px var(--tw-border); }
 .tw-plot-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tw-plot-axis { stroke: var(--tw-border); stroke-width: 1; }
 .tw-plot-curve { fill: none; stroke: var(--tw-accent, var(--tw-text-primary)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.tw-plot-field { display: flex; align-items: center; gap: 7px; height: var(--tw-row-height); padding: 0 10px; background: var(--tw-surface); border-radius: var(--tw-radius); box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 0.15s; }
+.tw-plot-field { display: flex; align-items: center; gap: 7px; height: var(--tw-row-height); padding: 0 10px 0 12px; background: var(--tw-surface); border-radius: var(--tw-radius); box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 0.15s; } /* 12px left lines the "y =" prefix up with the caption above it (the row idiom) */
 .tw-plot-field:focus-within { box-shadow: inset 0 0 0 1px var(--tw-border-hover); }
 .tw-plot-fx { flex: none; font-size: 12px; color: var(--tw-text-tertiary); font-variant-numeric: tabular-nums; user-select: none; }
 .tw-plot-input { flex: 1; min-width: 0; padding: 0; background: none; border: none; outline: none; color: var(--tw-text-primary); font-family: var(--tw-font-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 12px; }
