@@ -302,11 +302,12 @@
  * provides the containment. The toggle sits in the same right-hand column as the
  * value readouts (sliders, numbers): the buttons hug their text with even padding
  * (min-width:0 below) so the pill sits centred on the active label and matches the
- * tabs' pill height, rather than bulging off-centre. The pill carries 2px of seg
- * padding, so a -2px margin pulls it out by exactly that — landing the pill's right
- * edge on the value column (where the slider value / number readouts end), not 2px
- * past it. */
-.tw-row .tw-seg { flex-shrink: 0; margin-right: -2px; }
+ * tabs' pill height, rather than bulging off-centre. The pill is a filled element, so
+ * it wants an even frame: it sits 4px off the top + bottom (24px pill in a 32px row),
+ * so it should sit 4px off the right too — not 10px. The -8px margin (the row's 10px
+ * right padding, less the 4px target gap, less the seg's own 2px pad) pulls the pill's
+ * right edge to that 4px line, so the inset is uniform on all three sides. */
+.tw-row .tw-seg { flex-shrink: 0; margin-right: -8px; }
 .tw-seg-pill {
   position: absolute; top: 2px; bottom: 2px; left: 0; width: 0;
   background: var(--tw-accent, var(--tw-surface-active)); border-radius: calc(var(--tw-radius) - 2px); z-index: 0; pointer-events: none;
@@ -369,10 +370,11 @@
 .tw-button:active { background: var(--tw-surface-active); transform: scale(0.975); transition: background 0.15s, color 0.15s, transform 0.08s ease-out; }
 
 /* ── Button group — compact actions under one label ── */
-/* No negative margin: the buttons respect the row's 10px right padding, so the group's
- * right edge lands on the value column (where the slider / number readouts end) rather
- * than running full-bleed to the row edge — symmetric with the row's 12-left / 10-right. */
-.tw-buttongroup-btns { display: flex; gap: 4px; flex: 1; min-width: 0; }
+/* The buttons are filled, 24px tall in a 32px row → 4px off the top + bottom; the -6px
+ * margin (the row's 10px right padding, less the 4px target gap) pulls them to sit 4px
+ * off the right too, so the group is evenly inset on all three sides rather than carrying
+ * a 10px gap on the right against a 4px gap top/bottom. */
+.tw-buttongroup-btns { display: flex; gap: 4px; flex: 1; min-width: 0; margin-right: -6px; }
 .tw-buttongroup-btn { flex: 1 1 0; min-width: 0; padding: 5px 8px; font: inherit; font-size: 12px; font-weight: 500; color: var(--tw-text-label); background: var(--tw-surface-active); border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.15s, color 0.15s, transform 0.2s var(--tw-ease-pop); }
 .tw-buttongroup-btn:hover { background: var(--tw-surface-hover); color: var(--tw-text-primary); }
 .tw-buttongroup-btn:active { transform: scale(0.93); transition: background 0.15s, color 0.15s, transform 0.08s ease-out; }
