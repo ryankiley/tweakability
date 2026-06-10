@@ -426,11 +426,10 @@
 .tw-select-option {
   display: block; width: 100%; padding: 8px 10px; font: inherit; font-size: 12px; font-weight: 500;
   color: var(--tw-text-label); background: transparent; border: none; border-radius: 6px;
-  cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s, transform 0.15s var(--tw-ease-out);
+  cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s;
 }
-/* Hovered/keyboard-focused option eases a few px toward its text — the row leans in. */
-.tw-select-option:hover { background: var(--tw-surface-hover); transform: translateX(3px); }
-.tw-select-option:focus-visible { background: var(--tw-surface-hover); color: var(--tw-text-primary); transform: translateX(3px); outline: none; } /* keyboard focus reads as the hover highlight (roving focus in the listbox) */
+.tw-select-option:hover { background: var(--tw-surface-hover); }
+.tw-select-option:focus-visible { background: var(--tw-surface-hover); color: var(--tw-text-primary); outline: none; } /* keyboard focus reads as the hover highlight (roving focus in the listbox) */
 .tw-select-option[data-selected="true"] { color: var(--tw-text-primary); background: var(--tw-accent, var(--tw-surface-active)); }
 
 /* ── Presets menu — a portaled toolbar menu to save / load / delete named value
@@ -451,8 +450,8 @@
 .tw-presets-list { display: flex; flex-direction: column; gap: 2px; max-height: 200px; overflow-y: auto; }
 .tw-presets-empty { padding: 8px; font-size: 12px; font-weight: 500; color: var(--tw-text-tertiary); text-align: center; }
 .tw-presets-row { display: flex; align-items: center; gap: 2px; }
-.tw-presets-load { flex: 1; min-width: 0; text-align: left; font: inherit; font-size: 12px; font-weight: 500; color: var(--tw-text-label); background: transparent; border: none; border-radius: 6px; padding: 6px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.15s, color 0.15s, transform 0.15s var(--tw-ease-out); }
-.tw-presets-load:hover { background: var(--tw-surface-hover); color: var(--tw-text-primary); transform: translateX(3px); }
+.tw-presets-load { flex: 1; min-width: 0; text-align: left; font: inherit; font-size: 12px; font-weight: 500; color: var(--tw-text-label); background: transparent; border: none; border-radius: 6px; padding: 6px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.15s, color 0.15s; }
+.tw-presets-load:hover { background: var(--tw-surface-hover); color: var(--tw-text-primary); }
 .tw-presets-del { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--tw-text-tertiary); background: transparent; border: none; border-radius: 6px; cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.2s var(--tw-ease-pop); }
 .tw-presets-del:hover { background: var(--tw-surface-hover); color: var(--tw-text-primary); }
 .tw-presets-del:active { transform: scale(0.85); transition: background 0.15s, color 0.15s, transform 0.08s ease-out; }
@@ -690,7 +689,7 @@
 .tw-field .tw-num-grab { width: 10px; }
 
 /* ── Knob / dial — a rotary value control (drag to turn, wheel/arrows to nudge) ── */
-.tw-knob { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 12px 8px 9px; background: var(--tw-surface); border-radius: var(--tw-radius); }
+.tw-knob { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; background: var(--tw-surface); border-radius: var(--tw-radius); }
 .tw-knob-dial { position: relative; width: 88px; height: 88px; cursor: ns-resize; touch-action: none; outline: none; border-radius: 999px; }
 /* The whole dial lifts a touch while you turn it — the slider handle's "weight on press". */
 .tw-knob-svg { width: 100%; height: 100%; display: block; overflow: visible; transition: transform 0.2s var(--tw-ease-spring); }
