@@ -41,7 +41,6 @@ const LAZY_IMPORT: Record<string, () => Promise<unknown>> = TW_SPLIT ? {
   bezier: () => import("./controls/bezier.js"),
   point: () => import("./controls/point.js"),
   plot: () => import("./controls/plot.js"),
-  knob: () => import("./controls/knob.js"),
 } : {};
 const loading = {};
 const ensure = (type) => (getControl(type) || !LAZY_IMPORT[type]) ? null : (loading[type] ||= LAZY_IMPORT[type]());
@@ -130,8 +129,6 @@ function baseMetaFor(key, value) {
   // Explicit slider/number object forms so shorthand controls can carry options
   // (render / disabled / hint / step) that the [min,max] array shorthand can't.
   if (typed(value, "slider")) { const mn = value.min ?? 0, mx = value.max ?? 1; return { type: "slider", key, label, value: value.value ?? mn, min: mn, max: mx, step: value.step ?? inferStep(mn, mx), soft: value.soft, alt: value.alt }; }
-  // Knob — an explicit rotary dial over [min, max] (no shorthand; a bare number stays a slider).
-  if (typed(value, "knob")) { const mn = value.min ?? 0, mx = value.max ?? 1; return { type: "knob", key, label, value: value.value ?? mn, min: mn, max: mx, step: value.step ?? inferStep(mn, mx) }; }
   if (typed(value, "number")) return { type: "number", key, label, value: value.value ?? 0, min: value.min, max: value.max, step: value.step ?? 1, soft: value.soft };
   // Explicit toggle object form so a boolean can carry a hint/render/disabled — a bare `true` has nowhere to hang them.
   if (typed(value, "toggle")) return { type: "toggle", key, label, value: !!value.value };
@@ -645,7 +642,7 @@ function hideHint() { if (hintTip) hintTimer = setTimeout(() => hintTip.classLis
 // text in the tooltip on hover/focus — discoverable and keyboard-reachable, unlike
 // the old native `title`. Shared by the panel build (registerCond) and enhance().
 function addHintMarker(node: any, hint: string, themeVars?: any) {
-  const label = node.querySelector(".tw-slider-label, .tw-row-label, .tw-select-label, .tw-color-label, .tw-gradient-label, .tw-radiogrid-label, .tw-field-label, .tw-knob-label, .tw-folder-title, .tw-fps-label, .tw-plot-label") || node;
+  const label = node.querySelector(".tw-slider-label, .tw-row-label, .tw-select-label, .tw-color-label, .tw-gradient-label, .tw-radiogrid-label, .tw-field-label, .tw-folder-title, .tw-fps-label, .tw-plot-label") || node;
   const mark = el("button", "tw-hint", ICON_INFO); mark.type = "button"; mark.setAttribute("aria-label", hint);
   const show = () => showHint(mark, hint, themeVars);
   mark.addEventListener("pointerenter", show);
@@ -757,7 +754,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const resetEntry = (e) => { e.set(e.def); e.target[e.key] = e.get(); params._last = e.key; notify(); };
   const wireReset = (root, entry) => {
     const t = root.querySelector(".tw-slider-value")
-      || root.querySelector(".tw-row-label, .tw-select-label, .tw-color-label, .tw-gradient-label, .tw-radiogrid-label, .tw-field-label, .tw-knob-label")
+      || root.querySelector(".tw-row-label, .tw-select-label, .tw-color-label, .tw-gradient-label, .tw-radiogrid-label, .tw-field-label")
       || root;
     t.classList.add("tw-resettable"); t.title = "Double-click or hold to reset";
     // Coarse pointers get a press-and-hold reset — the desktop double-click fights
@@ -1083,7 +1080,6 @@ const dataMeta = (host) => {
   if (type === "buttongroup") return { type, key: "v", label, buttons: (d.buttons || "").split(",").map((s) => s.trim()).filter(Boolean).map((lab) => ({ label: lab, action: () => showToast(`${lab} pressed`) })) };
   if (type === "separator") return { type, key: "v", label };
   if (type === "number") return { type, key: "v", label, value: +(d.value ?? 0), min: d.min != null ? +d.min : undefined, max: d.max != null ? +d.max : undefined, step: +(d.step || 1) };
-  if (type === "knob") { const mn = +(d.min ?? 0), mx = +(d.max ?? 1); return { type, key: "v", label, value: +(d.value ?? mn), min: mn, max: mx, step: +(d.step || inferStep(mn, mx)) }; }
   if (type === "string") return { type, key: "v", label, value: d.value ?? "", placeholder: d.placeholder, rows: d.rows != null ? +d.rows : undefined };
   if (type === "image") return { type, key: "v", label, value: d.value || "" };
   if (type === "fps") return { type, key: "v", label: d.label || "FPS" };

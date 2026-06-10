@@ -24,7 +24,6 @@ export interface ControlOptions {
 /** The verbose object forms a schema value can take: `{ type: "…", … }`. */
 export type SchemaObject =
   | { type: "slider"; value?: number; min?: number; max?: number; step?: number; soft?: boolean; alt?: boolean }
-  | { type: "knob"; value?: number; min?: number; max?: number; step?: number }
   | { type: "number"; value?: number; min?: number; max?: number; step?: number; soft?: boolean }
   | { type: "toggle"; value?: boolean }
   | { type: "select"; options: Option[]; value?: string }

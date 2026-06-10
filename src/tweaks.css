@@ -701,23 +701,6 @@
 .tw-field .tw-num { flex: 1; width: auto; min-width: 0; }
 .tw-field .tw-num-grab { width: 10px; }
 
-/* ── Knob / dial — a rotary value control (drag to turn, wheel/arrows to nudge) ── */
-.tw-knob { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; background: var(--tw-surface); border-radius: var(--tw-radius); } /* 8px to match the spring block — the kit's other viz-over-controls panel */
-.tw-knob-dial { position: relative; width: 88px; height: 88px; cursor: ns-resize; touch-action: none; outline: none; border-radius: 999px; }
-/* The whole dial lifts a touch while you turn it — the slider handle's "weight on press". */
-.tw-knob-svg { width: 100%; height: 100%; display: block; overflow: visible; transition: transform 0.2s var(--tw-ease-spring); }
-.tw-knob-dial.is-active .tw-knob-svg { transform: scale(1.05); }
-.tw-knob-track { fill: none; stroke: var(--tw-surface-active); stroke-width: 6; stroke-linecap: round; }
-.tw-knob-value-arc { fill: none; stroke: var(--tw-accent, var(--tw-text-primary)); stroke-width: 6; stroke-linecap: round; }
-/* The pointer dot is the knob's handle: hidden at rest, it fades in on hover/focus and
- * rides bright while turning — mirroring the slider handle's reveal. */
-.tw-knob-dot { fill: var(--tw-text-primary); stroke: var(--tw-base); stroke-width: 2; opacity: 0; transition: opacity 0.18s; }
-.tw-knob-dial:hover .tw-knob-dot, .tw-knob-dial:focus-visible .tw-knob-dot, .tw-knob-dial.is-active .tw-knob-dot { opacity: 1; }
-.tw-knob-readout { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; font-family: var(--tw-font-sans); color: var(--tw-text-primary); pointer-events: none; transition: color 0.15s; }
-.tw-knob-dial.is-active .tw-knob-readout { color: var(--tw-text-focus); }
-.tw-knob-label { font-size: 12px; font-weight: 500; color: var(--tw-text-label); }
-.tw-knob-dial:focus-visible { box-shadow: 0 0 0 2px var(--tw-accent, var(--tw-text-focus)); }
-
 /* ── Cubic bezier — interactive curve editor (plugin-essentials CubicBezier) ── */
 .tw-bezier { display: flex; flex-direction: column; gap: 6px; }
 .tw-bezier-graph { position: relative; width: 100%; height: 140px; background: var(--tw-surface); border-radius: var(--tw-radius); overflow: hidden; touch-action: none; }
@@ -795,7 +778,7 @@
  * font with `font: inherit` (a shorthand that also clears font-variant-numeric),
  * so this has to win on source order to stick. */
 .tw-slider-value, .tw-slider-input, .tw-fps-val, .tw-num, .tw-grab-bubble,
-.tw-color-value, .tw-color-gamut, .tw-color-chan-input, .tw-knob-readout {
+.tw-color-value, .tw-color-gamut, .tw-color-chan-input {
   font-variant-numeric: tabular-nums;
 }
 

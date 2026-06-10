@@ -17,7 +17,6 @@ import { tweaks } from "tweakability/core";
 
 const panel = tweaks("Card", {
   blur: [24, 0, 100, 1],          // [value, min, max, step] → slider
-  gain: { type: "knob", value: 0.6, min: 0, max: 1, step: 0.01 }, // → rotary dial
   visible: true,                   // → toggle
   blend: ["normal", "multiply"],   // → dropdown
   tint: "#7C5CFF",                 // → wide-gamut colour picker
@@ -31,8 +30,7 @@ Drag the panel by its header to reposition it — an inline panel lifts into a f
 layer on the first drag and parks against the nearest edge on release (opt out with
 `{ draggable: false }`; `{ floating: true }` starts it floated). Size on the wire: the
 code-split entry is ~12 KB gzip for a basic panel — the colour engine and each heavier
-control (the knob is ~1.4 KB) load only when first used; the single file is ~30 KB gzip
-with everything inlined.
+control load only when first used; the single file is ~30 KB gzip with everything inlined.
 
 Add the styles too: `tweakability/css` (i.e. `dist/tweaks.css`).
 
