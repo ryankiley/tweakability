@@ -57,7 +57,8 @@ and serves it on :4330.
 
 ## Credits
 
-Inspired by [Tweakpane](https://tweakpane.github.io) by [cocopon](https://github.com/cocopon).
+Inspired by [Tweakpane](https://tweakpane.github.io) by [cocopon](https://github.com/cocopon)
+and [dialkit](https://github.com/joshpuckett/dialkit) by [Josh Puckett](https://github.com/joshpuckett).
 The toolbar and control icons are inline SVGs from [Lucide](https://lucide.dev) (ISC) and,
 upstream, [Feather](https://feathericons.com) (MIT) — per-icon origins and full license
 texts are in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
