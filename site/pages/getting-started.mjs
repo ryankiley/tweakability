@@ -74,8 +74,8 @@ export const examples = [
       and the key that changed. Move a slider and watch the log.</p>`,
     target: `<pre class="gs-log">— move a control —</pre>`,
     css: `
-      .gs-log { width: 100%; margin: 0; padding: 14px 16px; border-radius: 10px; background: #141414;
-                border: 1px solid #242424; font-size: 12px; line-height: 1.7; color: #b9b9b9;
+      .gs-log { width: 100%; margin: 0; padding: 14px 16px; border-radius: 10px; background: #0e0e0e;
+                border: 1px solid #1f1f1f; font-size: 12px; line-height: 1.7; color: #b9b9b9;
                 white-space: pre-wrap; word-break: break-all; align-self: stretch; }`,
     run: ({ tweaks, mount, target }) => {
       const log = target.querySelector(".gs-log");

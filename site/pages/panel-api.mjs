@@ -24,7 +24,7 @@ export const examples = [
     target: `<pre class="pa-log">— change something —</pre>`,
     css: `
       .pa-log { width: 100%; align-self: stretch; margin: 0; padding: 14px 16px; border-radius: 10px;
-                background: #141414; border: 1px solid #242424; font-size: 12px; line-height: 1.8;
+                background: #0e0e0e; border: 1px solid #1f1f1f; font-size: 12px; line-height: 1.8;
                 color: #b9b9b9; white-space: pre-wrap; }`,
     run: ({ tweaks, mount, target }) => {
       const log = target.querySelector(".pa-log");
