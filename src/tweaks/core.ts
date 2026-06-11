@@ -86,7 +86,7 @@ const isObj = (v) => v && typeof v === "object";
 // options (render / disabled / hint / step) the array/boolean shorthands can't.
 const radiogridMeta = (v, key, label) => Array.isArray(v.options) && { type: "radiogrid", key, label, options: v.options, value: v.value ?? optValue(v.options[0]), cols: v.cols };
 const TYPED_META: Record<string, (v: any, key: string, label: string) => any> = {
-  slider: (v, key, label) => { const mn = v.min ?? 0, mx = v.max ?? 1; return { type: "slider", key, label, value: v.value ?? mn, min: mn, max: mx, step: v.step ?? inferStep(mn, mx), soft: v.soft, alt: v.alt }; },
+  slider: (v, key, label) => { const mn = v.min ?? 0, mx = v.max ?? 1; return { type: "slider", key, label, value: v.value ?? mn, min: mn, max: mx, step: v.step ?? inferStep(mn, mx), soft: v.soft }; },
   number: (v, key, label) => ({ type: "number", key, label, value: v.value ?? 0, min: v.min, max: v.max, step: v.step ?? 1, soft: v.soft }),
   checkbox: (v, key, label) => ({ type: "checkbox", key, label, value: !!v.value }),
   // "segmented" is kept as an alias: picking one of a list renders as the radio
@@ -160,15 +160,13 @@ function createSlider(meta, onChange) {
   const decimals = stepPrecision(step);
 
   const wrap = el("div", "tw-slider-wrap");
-  const track = el("div", "tw-slider"); if (meta.alt) track.classList.add("tw-slider--alt"); // "slider alternate" — M3 gap: a bar floating between two rounded track pills (workshop variant)
+  const track = el("div", "tw-slider");
   const hashes = el("div", "tw-slider-hashmarks");
   const fill = el("div", "tw-slider-fill");
-  const inactiveBar = meta.alt ? el("div", "tw-slider-inactive") : null; // alt (M3): the inactive track is its own rounded pill, separated from the bar by a transparent gap
   const handle = el("div", "tw-slider-handle");
   const labelEl = el("span", "tw-slider-label"); labelEl.textContent = label;
   const valueEl = el("span", "tw-slider-value");
   track.append(hashes, fill, handle, labelEl, valueEl);
-  if (inactiveBar) track.insertBefore(inactiveBar, handle);
   wrap.append(track);
 
   // Keyboard + ARIA: the track is a focusable role="slider"; value attributes are
@@ -196,21 +194,8 @@ function createSlider(meta, onChange) {
     // few px off its notch toward the cursor; the handle rides the same edge.
     const off = pull ? ` + ${pull.toFixed(1)}px` : "";
     const edge = `${pct}%${off}`;
-    if (meta.alt) {
-      // M3 gap that stops short of the ends exactly like the OG handle: the 3px bar centres
-      // on the value through the middle, but clamps into [5px, 100%−9px] — the same span the
-      // OG handle rides (5px at the floor, trackW−9 at the max) — so it never touches the
-      // rounded track edge. The inactive pill derives from the *clamped* bar (so the 3px gaps
-      // hold at the extremes); the active fill takes min(value, bar) so it empties to 0 at the
-      // floor yet still stops with the bar — never overshooting it — once the bar clamps near max.
-      track.style.setProperty("--tw-bar", `clamp(5px, calc(${edge} - 1.5px), calc(100% - 9px))`);
-      handle.style.left = "var(--tw-bar)";
-      fill.style.width = `max(0px, min(calc(${edge} - 4.5px), calc(var(--tw-bar) - 3px)))`;
-      if (inactiveBar) inactiveBar.style.left = `calc(var(--tw-bar) + 6px)`;
-    } else {
-      fill.style.width = pull ? `calc(${edge})` : pct + "%";
-      handle.style.left = `max(5px, calc(${edge} - 9px))`; // the inset hairline rides just inside the fill edge
-    }
+    fill.style.width = pull ? `calc(${edge})` : pct + "%";
+    handle.style.left = `max(5px, calc(${edge} - 9px))`; // the inset hairline rides just inside the fill edge
     valueEl.textContent = q(value).toFixed(decimals);
     track.setAttribute("aria-valuenow", String(q(value)));
     track.setAttribute("aria-valuetext", q(value).toFixed(decimals));
@@ -220,12 +205,10 @@ function createSlider(meta, onChange) {
     // dims right as it reaches the number, not a fixed fraction early.
     const trackW = wrap.offsetWidth;
     if (trackW) {
-      // Dodge tracks the handle's *actual* span: the default hairline sits at pct%−9
-      // (3px wide); the alt's M3 bar is centred on the value at pct%−2 (4px wide). Using
-      // the bar's own geometry is what fixes the "miscalculated by the gap" dimming.
-      const hOff = meta.alt ? 1.5 : 9, hw = 3; // alt bar is now 3px, same as the default handle
+      // Dodge tracks the handle's *actual* span: the hairline sits at pct%−9 (3px wide),
+      // so comparing that span against the label/value text edges fixes the early-dim.
+      const hOff = 9, hw = 3;
       let hx = Math.max(5, (pct / 100) * trackW + pull - hOff);
-      if (meta.alt) hx = Math.min(hx, trackW - 9); // bar clamps inside at the max end (matches the render's --tw-bar)
       const M = 0; // pure overlap on both edges: dim the handle only while it truly covers the label/value and re-show it the instant it clears. (The old 6px value-side buffer dimmed the OG handle a few px early AND kept it dimmed past the readout at the max — so the handle vanished on the trailing edge.)
       const labelLeft = labelEl.offsetLeft, labelRight = labelLeft + labelEl.offsetWidth;  // leading label's span — read live, so it tracks the CSS left + font width and can't drift
       const valueLeft = valueEl.offsetLeft, valueRight = valueLeft + valueEl.offsetWidth;  // trailing value's span — read live, same reason
@@ -1080,7 +1063,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
 // ── Markup-driven enhancement (the showcase: minimal [data-tw] hosts → live control) ──
 const dataMeta = (host) => {
   const d = host.dataset, type = d.tw, label = d.label || titleCase(d.key || type);
-  if (type === "slider") return { type, key: "v", label, value: +(d.value ?? 0), min: +(d.min ?? 0), max: +(d.max ?? 100), step: +(d.step || inferStep(+(d.min ?? 0), +(d.max ?? 100))), soft: d.soft === "true" || d.soft === "", alt: d.alt === "true" || d.alt === "" };
+  if (type === "slider") return { type, key: "v", label, value: +(d.value ?? 0), min: +(d.min ?? 0), max: +(d.max ?? 100), step: +(d.step || inferStep(+(d.min ?? 0), +(d.max ?? 100))), soft: d.soft === "true" || d.soft === "" };
   if (type === "checkbox") {
     // A list of options is a single-select → radio grid; a bare checkbox is boolean.
     const options = d.options ? d.options.split(",").map((s) => s.trim()).filter(Boolean) : null;

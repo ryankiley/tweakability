@@ -1,50 +1,86 @@
-// ── Point — 2D/3D/4D component fields with an optional drag pad. Lazy.
-import { el, svgEl, numField, dragGesture, boxFrac, clamp, registerControl } from "../shared.js";
+// ── Point — 2D/3D/4D vector. Lazy.
+import { el, svgEl, numField, dragGesture, boxFrac, clamp, stepPrecision, popover, registerControl } from "../shared.js";
 
-// ── Point — a row of labelled numeric components (Tweakpane's point2d/3d/4d).
-// The grouped grab-handle fields you see on Spring, made a control of its own. ──
+// ── Point — a compact trigger row (label + value readout + a mini pad preview) that
+// opens the 2D pad over the component number fields in a portaled popover, the way the
+// colour control opens its picker (Tweakpane's point2d/3d/4d). The pad drives the first
+// two components; the rest are field-only. Opt out of the pad with `pad: false`. ──
 function createPoint(meta, onChange) {
   const comps = meta.components; // [{ key, label, value, step, min, max }]
   const out = {};
   const root = el("div", "tw-point");
-  // Optional 2D drag pad (meta.pad, 2 components only) — a square plane driving the
-  // first two components at once (leva's joystick / Tweakpane's point2d picker).
-  // Right = +X; up = +Y by default (set invertY for screen-space, where down = +Y).
-  // Modelled on the colour area's drag; falls back to the numeric fields when off.
-  let positionPad = () => {};
-  const hasPad = !!meta.pad && comps.length === 2;
-  const padHost = hasPad ? el("div", "tw-pad") : null;
-  if (padHost) root.append(padHost); // the pad sits above the numeric fields
+
+  // ── Trigger row — label + value + a mini pad preview (the colour swatch's analog). ──
+  const trigger = el("button", "tw-point-trigger"); trigger.type = "button"; trigger.setAttribute("aria-expanded", "false");
+  const labelEl = el("span", "tw-point-label"); labelEl.textContent = meta.label || "Point";
+  const right = el("span", "tw-point-right");
+  const valueEl = el("span", "tw-point-value");
+  const preview = el("div", "tw-point-preview");
+  const previewDot = el("div", "tw-point-preview-dot");
+  preview.append(previewDot);
+  right.append(valueEl, preview);
+  trigger.append(labelEl, right);
+
+  // ── Popover — the 2D pad over the component fields. Carries the colour popover's
+  // class so it inherits its shell, tokens, and short-viewport scroll. ──
+  const pop = el("div", "tw-color-pop tw-point-pop");
+  const body = el("div", "tw-point-body");
+  pop.append(body);
+
+  const hasPad = meta.pad !== false && comps.length >= 2;
+  const cx = comps[0], cy = comps[1];
+  const minX = cx?.min ?? -1, maxX = cx?.max ?? 1, minY = cy?.min ?? -1, maxY = cy?.max ?? 1;
+  const frac = (v, lo, hi) => (hi > lo ? clamp((v - lo) / (hi - lo), 0, 1) : 0.5);
+
+  let padHost = null, padThumb = null, padLine = null;
+  if (hasPad) {
+    padHost = el("div", "tw-pad");
+    padThumb = el("div", "tw-pad-thumb");
+    // A polar tether from the origin (where 0,0 maps) to the thumb, so the point reads
+    // as a vector (magnitude + angle). The pad is square so the angle is true.
+    const padSvg = svgEl("svg", "tw-pad-line"); padSvg.setAttribute("viewBox", "0 0 100 100"); padSvg.setAttribute("preserveAspectRatio", "none");
+    padLine = svgEl("line"); padSvg.append(padLine);
+    padHost.append(el("div", "tw-pad-axis tw-pad-axis-x"), el("div", "tw-pad-axis tw-pad-axis-y"), padSvg, padThumb);
+    body.append(padHost);
+  }
+
   const fields = el("div", "tw-fields");
-  root.append(fields);
+  body.append(fields);
+  const sync = () => { positionPad(); paintValue(); };
   const flds = comps.map((c) => {
-    const fld = numField({ label: c.label, value: c.value ?? 0, step: c.step ?? 1, min: c.min, max: c.max }, (val) => { out[c.key] = val; positionPad(); onChange({ ...out }); });
+    const fld = numField({ label: c.label, value: c.value ?? 0, step: c.step ?? 1, min: c.min, max: c.max }, (val) => { out[c.key] = val; sync(); onChange({ ...out }); });
     out[c.key] = fld.get(); // mirror the field's sanitized value, not the raw c.value (which may be non-finite)
     fields.append(fld.el); return fld;
   });
+
+  // Value readout for the row — the components joined, trimmed; the preview dot shows
+  // the first two on a square (right = +X, up = +Y by default; set invertY for screen-space).
+  // Match each component's number field: format to the step's decimal precision, so a
+  // value reads "−1.00, −0.46" (steady columns), not "−1, −0.46" (trailing zeros trimmed).
+  const fmt = (v, step) => (+v).toFixed(stepPrecision(step ?? 1));
+  const paintValue = () => { valueEl.textContent = comps.map((c) => fmt(out[c.key], c.step)).join(", "); };
+  let positionPad = () => { previewDot.style.left = "50%"; previewDot.style.top = "50%"; };
+
   if (hasPad) {
-    const cx = comps[0], cy = comps[1];
-    const minX = cx.min ?? -1, maxX = cx.max ?? 1, minY = cy.min ?? -1, maxY = cy.max ?? 1;
-    const padThumb = el("div", "tw-pad-thumb");
-    // A polar tether — a line from the origin (where 0,0 maps) to the thumb, so the
-    // point reads as a vector (magnitude + angle). The pad is square so the angle is true.
-    const padSvg = svgEl("svg", "tw-pad-line"); padSvg.setAttribute("viewBox", "0 0 100 100"); padSvg.setAttribute("preserveAspectRatio", "none");
-    const padLine = svgEl("line"); padSvg.append(padLine);
-    padHost.append(el("div", "tw-pad-axis tw-pad-axis-x"), el("div", "tw-pad-axis tw-pad-axis-y"), padSvg, padThumb);
-    const frac = (v, lo, hi) => (hi > lo ? clamp((v - lo) / (hi - lo), 0, 1) : 0.5);
+    // The row's mini preview is tiny + clipped, so inset the dot (5px wide) to keep it
+    // fully in bounds at the corners — the slider handle's "ride inside the track" trick /
+    // the colour strips' inside(): the centre travels from +2.5px at 0 to −2.5px at 1.
+    const DOT = 5;
+    const inset = (f) => `calc(${(f * 100).toFixed(2)}% + ${((0.5 - f) * DOT).toFixed(2)}px)`;
     positionPad = () => {
       const fx = frac(out[cx.key], minX, maxX), fyv = frac(out[cy.key], minY, maxY);
-      const tx = fx * 100, ty = (meta.invertY ? fyv : 1 - fyv) * 100;
+      const tyFrac = meta.invertY ? fyv : 1 - fyv;
+      const tx = fx * 100, ty = tyFrac * 100;
       padThumb.style.left = tx + "%"; padThumb.style.top = ty + "%";
+      previewDot.style.left = inset(fx); previewDot.style.top = inset(tyFrac); // mini pad: dot stays in bounds
       const ox = frac(0, minX, maxX) * 100, oyv = frac(0, minY, maxY), oy = (meta.invertY ? oyv : 1 - oyv) * 100;
       padLine.setAttribute("x1", ox); padLine.setAttribute("y1", oy); padLine.setAttribute("x2", tx); padLine.setAttribute("y2", ty);
     };
-    const padXY = (e) => boxFrac(e, padHost);
     const padSet = (e) => {
-      const [fx, fy] = padXY(e); const yFrac = meta.invertY ? fy : 1 - fy;
+      const [fx, fy] = boxFrac(e, padHost); const yFrac = meta.invertY ? fy : 1 - fy;
       flds[0].set(minX + fx * (maxX - minX)); flds[1].set(minY + yFrac * (maxY - minY));
       out[cx.key] = flds[0].get(); out[cy.key] = flds[1].get();
-      positionPad(); onChange({ ...out });
+      sync(); onChange({ ...out });
     };
     // .is-grabbing scales the thumb on press (CSS, spring) — the pad's echo of the slider lift.
     dragGesture(padHost, {
@@ -53,9 +89,16 @@ function createPoint(meta, onChange) {
       onEnd: () => padHost.classList.remove("is-grabbing"),
     });
   }
-  positionPad();
-  return { el: root, set: (v) => { if (v) comps.forEach((c, k) => { if (v[c.key] != null) { flds[k].set(v[c.key]); out[c.key] = flds[k].get(); } }); positionPad(); }, get: () => ({ ...out }) };
+
+  root.append(trigger, pop);
+  popover(root, trigger, pop, { width: 216, fallbackH: 240, gap: 6, onOpen: sync });
+  sync();
+
+  return {
+    el: root,
+    set: (v) => { if (v) comps.forEach((c, k) => { if (v[c.key] != null) { flds[k].set(v[c.key]); out[c.key] = flds[k].get(); } }); sync(); },
+    get: () => ({ ...out }),
+  };
 }
 
 registerControl("point", createPoint);
-
