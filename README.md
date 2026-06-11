@@ -16,8 +16,8 @@ import { tweaks } from "tweakability/core";
 
 const panel = tweaks("Card", {
   blur: [24, 0, 100, 1],          // [value, min, max, step] → slider
-  visible: true,                   // → toggle
-  blend: ["normal", "multiply"],   // → dropdown
+  visible: true,                   // → checkbox
+  blend: ["normal", "multiply"],   // → list
   tint: "#7C5CFF",                 // → wide-gamut colour picker
   motion: { type: "spring", stiffness: 220, damping: 18, mass: 1 },
 });
