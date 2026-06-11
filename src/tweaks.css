@@ -12,15 +12,15 @@
   --tw-surface: rgba(255, 255, 255, 0.04);
   --tw-surface-hover: rgba(255, 255, 255, 0.075);
   --tw-surface-active: rgba(255, 255, 255, 0.13);
-  --tw-surface-subtle: rgba(255, 255, 255, 0.025);
-  /* Text hierarchy */
+  /* Text hierarchy — the secondary/tertiary tones style 10–12px text (placeholders,
+   * gamut tags, field captions), so they sit at WCAG 4.5:1 against the base, not below. */
   --tw-text-root: #fafafa;
   --tw-text-section: rgba(255, 255, 255, 0.64);
   --tw-text-label: rgba(255, 255, 255, 0.64);
   --tw-text-focus: #ffffff;
   --tw-text-primary: rgba(255, 255, 255, 0.92);
   --tw-text-secondary: rgba(255, 255, 255, 0.56);
-  --tw-text-tertiary: rgba(255, 255, 255, 0.36);
+  --tw-text-tertiary: rgba(255, 255, 255, 0.5);
   /* Borders — deliberately faint: the panel leans on its shadow for definition, not
    * outlines, so every hairline here is a whisper. */
   --tw-border: rgba(255, 255, 255, 0.045);
@@ -47,11 +47,17 @@
    * or color-scheme reliance); flips in the light-mode block below like every other
    * --tw-* colour, so the kit confirms in green wherever it's lifted. */
   --tw-success: #86efac;
+  /* Danger accent — the plot's invalid-expression cue. Flips darker in the light
+   * blocks below so it holds contrast on the light surface. */
+  --tw-danger: #ff5f5f;
   /* Type — the system UI font (San Francisco on Apple, Segoe UI on Windows, Roboto
    * on Android). No host-token binding, so the panel renders the same lifted into
    * any project rather than picking up the site's own typeface; the value readouts
    * layer tabular figures on top (see below) so the live numbers hold their column. */
   --tw-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Monospace — the plot's expression field; declared (not just consumed) so the
+   * fontMono theme lever has a token to land on. Same stack in both schemes. */
+  --tw-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   /* Motion — one shared easing vocabulary so every control moves the way the
    * continuous slider does, rather than each picking its own curve. --out is the
    * quick decelerate (chevrons, sliding pills); --spring is the slider's signature
@@ -100,13 +106,15 @@
  * the kit's resolved palette, not the host page's color-scheme — a dark panel on an
  * undeclared light page still gets dark scrollbars. The light blocks at the foot of
  * the file flip this to light together with the tokens. */
-.tw-panel, .tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip { color-scheme: dark; }
+.tw-panel, .tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip, .tw-toast { color-scheme: dark; }
 
 /* Floating mode — a fixed, draggable panel. The header is the drag surface; a
  * grab cursor + a lift in elevation on pickup signal it. Below the portaled
- * popovers (z 50) so a control's dropdown still renders over the panel body.
+ * popovers (z 99999) so a control's dropdown still renders over the panel body;
+ * the whole ladder (panel 99990 < popovers 99999 < tip/toast 100000 < grab guide
+ * 100001) sits above the 100–9999 band host sticky headers routinely occupy.
  * Left/top are set inline by the JS. */
-.tw-panel[data-mode="floating"] { position: fixed; z-index: 40; box-shadow: var(--tw-shadow-panel-lifted); transition: box-shadow 0.25s var(--tw-ease-out); }
+.tw-panel[data-mode="floating"] { position: fixed; z-index: 99990; box-shadow: var(--tw-shadow-panel-lifted); transition: box-shadow 0.25s var(--tw-ease-out); }
 /* The footprint a lifted panel leaves behind in its old slot (see lift() in core) —
  * sized inline to the panel's rect so the host layout holds still. */
 .tw-lift-slot { display: block; flex: none; pointer-events: none; }
@@ -124,7 +132,7 @@
 .tw-panel[data-draggable="true"] > .tw-header,
 .tw-panel[data-mode="floating"] > .tw-header { touch-action: none; margin-top: -10px; padding-top: 10px; }
 /* Pickup: the panel lifts on a deeper shadow (eased in via the transition above). */
-.tw-panel.is-dragging { user-select: none; box-shadow: var(--tw-shadow-panel-lifted); z-index: 41; }
+.tw-panel.is-dragging { user-select: none; box-shadow: var(--tw-shadow-panel-lifted); z-index: 99991; }
 .tw-panel.is-dragging > .tw-header,
 .tw-panel.is-dragging > .tw-header .tw-header-toggle { cursor: grabbing; }
 
@@ -190,8 +198,15 @@
 .tw-hint:hover, .tw-hint:focus-visible { color: var(--tw-text-secondary); transform: scale(1.2); }
 .tw-hint:focus-visible { outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: 1px; border-radius: 999px; }
 .tw-hint svg { width: 13px; height: 13px; display: block; }
-.tw-tip { position: fixed; z-index: 60; max-width: 220px; padding: 6px 9px; font-family: var(--tw-font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif); font-size: 12px; line-height: 1.4; color: var(--tw-text-primary, rgba(255, 255, 255, 0.92)); background: var(--tw-dropdown-bg, #292929); border: 1px solid var(--tw-border, rgba(255, 255, 255, 0.05)); border-radius: 8px; box-shadow: var(--tw-shadow-dropdown, 0 12px 32px -8px rgba(0, 0, 0, 0.6)); pointer-events: none; opacity: 0; transform: translateY(2px); transition: opacity 0.12s, transform 0.12s; }
+.tw-tip { position: fixed; z-index: 100000; max-width: 220px; padding: 6px 9px; font-family: var(--tw-font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif); font-size: 12px; line-height: 1.4; color: var(--tw-text-primary, rgba(255, 255, 255, 0.92)); background: var(--tw-dropdown-bg, #292929); border: 1px solid var(--tw-border, rgba(255, 255, 255, 0.05)); border-radius: 8px; box-shadow: var(--tw-shadow-dropdown, 0 12px 32px -8px rgba(0, 0, 0, 0.6)); pointer-events: none; opacity: 0; transform: translateY(2px); transition: opacity 0.12s, transform 0.12s; }
 .tw-tip.is-open { opacity: 1; transform: none; }
+/* Toast — the kit's own feedback pill (copy / preset confirmations), portaled to
+ * <body> like the tip and sharing its bubble vocabulary: same surface, hairline and
+ * shadow tokens (with the tip's dark fallbacks — it lives outside the panel's token
+ * scope), so the light portal blocks at the foot of the file flip it with the other
+ * portaled surfaces. Bottom-centre, pointer-transparent, auto-hidden by the JS. */
+.tw-toast { position: fixed; left: 50%; bottom: 24px; z-index: 100000; box-sizing: border-box; max-width: min(320px, calc(100vw - 32px)); padding: 7px 14px; font-family: var(--tw-font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--tw-text-primary, rgba(255, 255, 255, 0.92)); background: var(--tw-dropdown-bg, #292929); border: 1px solid var(--tw-border, rgba(255, 255, 255, 0.05)); border-radius: 999px; box-shadow: var(--tw-shadow-dropdown, 0 12px 32px -8px rgba(0, 0, 0, 0.6)); pointer-events: none; opacity: 0; transform: translate(-50%, 6px); transition: opacity 0.16s, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.tw-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
 
 /* Collapse — grid-rows 1fr→0fr animates the body height, dependency-free */
 .tw-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -252,6 +267,9 @@
   outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: -2px;
 }
 .tw-toolbar-btn:focus-visible { outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: 1px; }
+/* Typeable fields — their border-tone shift on focus (~1.3:1) isn't a visible cue on
+ * its own; keyboard focus gets the same ring the presets input already draws. */
+.tw-text:focus-visible, .tw-num:focus-visible, .tw-color-chan-input:focus-visible, .tw-search:focus-visible, .tw-color-mode:focus-visible { outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: -2px; }
 
 /* ── Controls stack ── */
 .tw-controls { display: flex; flex-direction: column; gap: 6px; }
@@ -486,7 +504,7 @@
 .tw-select-chevron { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.6; margin-right: -4.5px; transition: transform 0.2s var(--tw-ease-out); }
 .tw-select.is-open .tw-select-chevron { transform: rotate(180deg); }
 .tw-select-dropdown {
-  position: fixed; z-index: 50; /* portaled to <body> + JS-placed → never clipped by the panel's overflow */
+  position: fixed; z-index: 99999; /* portaled to <body> + JS-placed → never clipped by the panel's overflow; above host sticky headers (see the floating-panel z ladder) */
   padding: 4px; border-radius: calc(var(--tw-radius) + 2px); /* concentric: option (radius − 2) + padding 4 */
   background: var(--tw-dropdown-bg); border: 1px solid var(--tw-border); box-shadow: var(--tw-shadow-dropdown);
   max-height: 60vh; overflow-y: auto;
@@ -507,7 +525,7 @@
 /* ── Presets menu — a portaled toolbar menu to save / load / delete named value
  * snapshots (appears only when the panel is built with opts.persist). ── */
 .tw-presets-menu {
-  position: fixed; z-index: 50; width: 208px;
+  position: fixed; z-index: 99999; width: 208px;
   display: flex; flex-direction: column; gap: 6px; padding: 8px;
   background: var(--tw-dropdown-bg); border: 1px solid var(--tw-border); border-radius: calc(var(--tw-radius) + 4px); box-shadow: var(--tw-shadow-dropdown); /* concentric: inner picker surface (radius) + padding 4 */
   transform-origin: top right; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.16s var(--tw-ease-out), transform 0.24s var(--tw-ease-spring);
@@ -562,7 +580,7 @@
   --tw-surface: rgba(255, 255, 255, 0.04); --tw-surface-hover: rgba(255, 255, 255, 0.075);
   --tw-surface-active: rgba(255, 255, 255, 0.13);
   --tw-text-label: rgba(255, 255, 255, 0.64); --tw-text-primary: rgba(255, 255, 255, 0.92);
-  --tw-text-focus: #ffffff; --tw-text-tertiary: rgba(255, 255, 255, 0.36);
+  --tw-text-focus: #ffffff; --tw-text-tertiary: rgba(255, 255, 255, 0.5);
   --tw-border: rgba(255, 255, 255, 0.045); --tw-border-hover: rgba(255, 255, 255, 0.11); --tw-selection: rgba(255, 255, 255, 0.22);
   --tw-dropdown-bg: #292929; --tw-base: #242424; --tw-radius: 8px; --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
   --tw-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -574,7 +592,7 @@
 
 /* the colour dropdown */
 .tw-color-pop {
-  position: fixed; z-index: 50; width: 240px; /* JS-placed from the trigger's viewport rect → stays attached to its row */
+  position: fixed; z-index: 99999; width: 240px; /* JS-placed from the trigger's viewport rect → stays attached to its row */
   display: flex; flex-direction: column; gap: 8px; padding: 10px;
   background: var(--tw-dropdown-bg); border: 1px solid var(--tw-border);
   border-radius: calc(var(--tw-radius) + 10px); /* concentric: inner control radius + padding 10 — same formula as the panel */
@@ -712,7 +730,7 @@
 .tw-num-grab:hover, .tw-num-grab.is-dragging { color: var(--tw-text-primary); transform: scale(1.22); }
 /* Tweakpane-style grab guide — portaled to <body> while dragging a number field:
  * a dotted line from the grab point to the cursor, with a floating value bubble. */
-.tw-grab-guide { position: fixed; inset: 0; z-index: 2000; pointer-events: none; }
+.tw-grab-guide { position: fixed; inset: 0; z-index: 100001; pointer-events: none; } /* tops the whole kit ladder — the guide spans the screen for the drag's duration */
 /* round dots with a controllable gap (a `dotted` border packs them too tightly) */
 .tw-grab-line { position: fixed; height: 2px; border: 0; transform: translateY(-50%); background: radial-gradient(circle closest-side, var(--tw-text-label) 99%, transparent) 0 50% / var(--tw-grab-gap, 7px) 2px repeat-x; }
 .tw-grab-dot { position: fixed; width: 5px; height: 5px; border-radius: 50%; background: var(--tw-text-label); transform: translate(-50%, -50%); }
@@ -821,8 +839,8 @@
 .tw-plot-input { flex: 1; min-width: 0; padding: 0; background: none; border: none; outline: none; color: var(--tw-text-primary); font-family: var(--tw-font-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 12px; }
 .tw-plot-input::placeholder { color: var(--tw-text-tertiary); }
 .tw-plot.is-invalid .tw-plot-curve { opacity: 0.25; }
-.tw-plot.is-invalid .tw-plot-field { box-shadow: inset 0 0 0 1px rgba(255, 95, 95, 0.6); }
-.tw-plot.is-invalid .tw-plot-fx { color: rgba(255, 95, 95, 0.8); }
+.tw-plot.is-invalid .tw-plot-field { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tw-danger) 60%, transparent); }
+.tw-plot.is-invalid .tw-plot-fx { color: color-mix(in srgb, var(--tw-danger) 80%, transparent); }
 
 /* ── Scheme resolution ──────────────────────────────────────────────────────────
  * The default look is dark. Panels follow the OS to light unless an ancestor pins
@@ -849,14 +867,13 @@
     --tw-surface: rgba(255, 255, 255, 0.82);
     --tw-surface-hover: rgba(0, 0, 0, 0.04);
     --tw-surface-active: rgba(0, 0, 0, 0.1);
-    --tw-surface-subtle: rgba(255, 255, 255, 0.55);
     --tw-text-root: #1a1a1a;
     --tw-text-section: rgba(0, 0, 0, 0.62);
     --tw-text-label: rgba(0, 0, 0, 0.58);
     --tw-text-focus: #000000;
     --tw-text-primary: rgba(0, 0, 0, 0.88);
-    --tw-text-secondary: rgba(0, 0, 0, 0.52);
-    --tw-text-tertiary: rgba(0, 0, 0, 0.34);
+    --tw-text-secondary: rgba(0, 0, 0, 0.58);
+    --tw-text-tertiary: rgba(0, 0, 0, 0.54);
     --tw-border: rgba(0, 0, 0, 0.045);
     --tw-border-hover: rgba(0, 0, 0, 0.1);
     --tw-selection: rgba(0, 0, 0, 0.14);
@@ -869,6 +886,7 @@
     --tw-shadow-panel: 0 0 0 1px var(--tw-border), 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 18px 44px -12px rgba(0, 0, 0, 0.16);
     --tw-shadow-panel-lifted: 0 0 0 1px var(--tw-border-hover), 0 6px 16px -3px rgba(0, 0, 0, 0.12), 0 30px 70px -16px rgba(0, 0, 0, 0.2);
     --tw-success: #15803d;
+    --tw-danger: #c23232;
     color-scheme: light; /* UA internals (scrollbars, carets) flip with the palette */
   }
   /* Light mode: thumb/handle need definition — a subtle thumb shadow */
@@ -876,11 +894,11 @@
   /* Portaled popovers carry their own tokens — flip them to light too. (The scheme
    * attribute, when present, sits on the portal root itself — copied at open; the
    * hint tooltip gets the same carry, else it would keep its dark fallbacks.) */
-  :is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip):where(:not([data-tw-scheme="dark"])) {
+  :is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip, .tw-toast):where(:not([data-tw-scheme="dark"])) {
     --tw-surface: rgba(255, 255, 255, 0.82); --tw-surface-hover: rgba(0, 0, 0, 0.04);
     --tw-surface-active: rgba(0, 0, 0, 0.1);
     --tw-text-label: rgba(0, 0, 0, 0.58); --tw-text-primary: rgba(0, 0, 0, 0.88);
-    --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.34);
+    --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.54);
     --tw-border: rgba(0, 0, 0, 0.045); --tw-border-hover: rgba(0, 0, 0, 0.1); --tw-selection: rgba(0, 0, 0, 0.14);
     --tw-dropdown-bg: #f6f6f6; --tw-base: #f3f3f3; --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.14);
     color-scheme: light;
@@ -894,14 +912,13 @@
   --tw-surface: rgba(255, 255, 255, 0.82);
   --tw-surface-hover: rgba(0, 0, 0, 0.04);
   --tw-surface-active: rgba(0, 0, 0, 0.1);
-  --tw-surface-subtle: rgba(255, 255, 255, 0.55);
   --tw-text-root: #1a1a1a;
   --tw-text-section: rgba(0, 0, 0, 0.62);
   --tw-text-label: rgba(0, 0, 0, 0.58);
   --tw-text-focus: #000000;
   --tw-text-primary: rgba(0, 0, 0, 0.88);
-  --tw-text-secondary: rgba(0, 0, 0, 0.52);
-  --tw-text-tertiary: rgba(0, 0, 0, 0.34);
+  --tw-text-secondary: rgba(0, 0, 0, 0.58);
+  --tw-text-tertiary: rgba(0, 0, 0, 0.54);
   --tw-border: rgba(0, 0, 0, 0.045);
   --tw-border-hover: rgba(0, 0, 0, 0.1);
   --tw-selection: rgba(0, 0, 0, 0.14);
@@ -911,14 +928,15 @@
   --tw-shadow-panel: 0 0 0 1px var(--tw-border), 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 18px 44px -12px rgba(0, 0, 0, 0.16);
   --tw-shadow-panel-lifted: 0 0 0 1px var(--tw-border-hover), 0 6px 16px -3px rgba(0, 0, 0, 0.12), 0 30px 70px -16px rgba(0, 0, 0, 0.2);
   --tw-success: #15803d;
+  --tw-danger: #c23232;
   color-scheme: light; /* UA internals (scrollbars, carets) flip with the palette */
 }
 .tw-slider-handle:where([data-tw-scheme="light"] *) { box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
-:is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip):where([data-tw-scheme="light"]) {
+:is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip, .tw-toast):where([data-tw-scheme="light"]) {
   --tw-surface: rgba(255, 255, 255, 0.82); --tw-surface-hover: rgba(0, 0, 0, 0.04);
   --tw-surface-active: rgba(0, 0, 0, 0.1);
   --tw-text-label: rgba(0, 0, 0, 0.58); --tw-text-primary: rgba(0, 0, 0, 0.88);
-  --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.34);
+  --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.54);
   --tw-border: rgba(0, 0, 0, 0.045); --tw-border-hover: rgba(0, 0, 0, 0.1); --tw-selection: rgba(0, 0, 0, 0.14);
   --tw-dropdown-bg: #f6f6f6; --tw-base: #f3f3f3; --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.14);
   color-scheme: light;
@@ -939,7 +957,9 @@
 .specimen:has(.tw-panel) { display: grid; justify-items: center; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tw-panel * { transition: none !important; } /* also neutralises the reset spin + hold charge, both transitions now — an instant −360° rotation is no visual change at all */
+  /* The panel itself (floating-shadow ease) and every portaled surface (.tw-portal —
+   * popovers, tip, toast, grab guide live on <body>, outside .tw-panel) join the kill. */
+  .tw-panel, .tw-panel *, .tw-portal, .tw-portal * { transition: none !important; } /* also neutralises the reset spin + hold charge, both transitions now — an instant −360° rotation is no visual change at all */
   /* Neutralise the one-shot keyframe entrances too (the transition kill above doesn't touch animations). */
   .tw-tabs-page[data-active="true"], .tw-grab-bubble { animation: none; }
 }

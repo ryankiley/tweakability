@@ -14,8 +14,8 @@
 
 import {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
-  optValue, optLabel, el, popover, stopPointerLeak, applyThemeVars, resolveTheme, onReady,
-  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, attachScrub, stretchPill, ICON_GRIP,
+  optValue, optLabel, el, popover, closeActivePopover, stopPointerLeak, applyThemeVars, resolveTheme, onReady,
+  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, attachScrub, stretchPill, ICON_GRIP, REDUCE_MOTION,
   registerControl, getControl,
 } from "./shared.js";
 import type { Schema, TweaksOptions, Panel, Params } from "./types.js";
@@ -46,7 +46,7 @@ const LAZY_IMPORT: Record<string, () => Promise<unknown>> = TW_SPLIT ? {
   plot: () => import("./controls/plot.js"),
 } : {};
 const loading: Record<string, Promise<unknown>> = {};
-const ensure = (type) => (getControl(type) || !LAZY_IMPORT[type]) ? null : (loading[type] ||= LAZY_IMPORT[type]());
+const ensure = (type) => (getControl(type) || !LAZY_IMPORT[type]) ? null : (loading[type] ||= LAZY_IMPORT[type]().catch((e) => { delete loading[type]; console.error(`[tweaks] control chunk "${type}" failed to load:`, e); throw e; })); // a rejection isn't cached — a later panel retries the chunk
 const scanTypes = (metas, set = new Set()) => {
   for (const m of metas) {
     if (!m) continue;
@@ -67,6 +67,7 @@ const ensureForMetas = (metas) => {
 // Per-control options (render / disabled / hint) ride on any object-form value; the
 // wrapper attaches them to whatever control baseMetaFor infers.
 function metaFor(key, value, depth = 0) {
+  if (key === "__proto__" || key === "constructor" || key === "prototype") return null; // params is an object-as-map — these keys would write through to the prototype
   const meta = baseMetaFor(key, value, depth);
   if (meta && value && typeof value === "object") {
     if (typeof value.render === "function") meta.render = value.render;
@@ -168,7 +169,9 @@ function baseMetaFor(key, value, depth = 0) {
     return { type: "list", key, label, options: value.options, value: value.value ?? optValue(value.options[0]) };
   if (isColorStr(value)) return { type: "color", key, label, value };
   if (typeof value === "string") return { type: "text", key, label, value };
-  if (isObj(value)) return { type: "folder", key, label, children: Object.entries(value).map(([k, v]) => metaFor(k, v, depth + 1)).filter(Boolean) };
+  // Option keys metaFor consumes off this same object (render / disabled / hint) are the
+  // folder's chrome, not children — a folder's `disabled: true` mustn't also build a checkbox.
+  if (isObj(value)) return { type: "folder", key, label, children: Object.entries(value).filter(([k, v]) => !(k === "render" && typeof v === "function") && !((k === "disabled" || k === "hint") && v != null)).map(([k, v]) => metaFor(k, v, depth + 1)).filter(Boolean) };
   return null;
 }
 
@@ -251,7 +254,7 @@ function createSlider(meta, onChange) {
   };
   render();
 
-  let rect = null, scale = 1, downPos = null, isClick = true, snapTimer, fineAnchor = null;
+  let rect = null, scale = 1, downPos = null, isClick = true, snapTimer, fineAnchor = null, downId = null;
   const GLIDE_FILL = "width 0.34s cubic-bezier(0.34,1.2,0.64,1)";
   const GLIDE_HANDLE = "left 0.34s cubic-bezier(0.34,1.2,0.64,1), opacity 0.15s, transform 0.2s cubic-bezier(0.22,1,0.36,1)";
   // Discrete detent — a spring resisting the snap. While dragging, the active track
@@ -284,7 +287,10 @@ function createSlider(meta, onChange) {
 
   track.addEventListener("pointerdown", (e) => {
     if (valueEl.classList.contains("is-editing")) return;
+    if (e.button !== 0 || downPos) return; // primary button only; a second pointer can't hijack a live drag
     e.preventDefault();
+    track.focus(); // preventDefault suppressed click-to-focus — restore it, so click-then-arrow-keys works
+    downId = e.pointerId;
     try { e.target.setPointerCapture(e.pointerId); } catch {}
     clearTimeout(snapTimer); track.style.transition = "";
     downPos = { x: e.clientX, y: e.clientY }; isClick = true;
@@ -296,7 +302,7 @@ function createSlider(meta, onChange) {
     set(valFromX(e.clientX));
   });
   track.addEventListener("pointermove", (e) => {
-    if (!downPos) return;
+    if (!downPos || e.pointerId !== downId) return;
     // Released off-track (e.g. outside the window, where a captured pointerup never
     // reaches us): the button is up but we're still in the drag. Bail on the next
     // move so the slider doesn't keep following the cursor.
@@ -334,8 +340,8 @@ function createSlider(meta, onChange) {
     }
     if (e.clientX >= rect.left && e.clientX <= rect.right) { track.style.width = ""; track.style.transform = ""; }
   });
-  const up = () => {
-    if (!downPos) return;
+  const up = (e?) => {
+    if (!downPos || (e && e.pointerId !== downId)) return;
     // value is already set (on press, then on every move) — release the tension pull so
     // the active track eases home onto its notch, and spring the rubber-band back.
     snapTimer = setTimeout(() => { fill.style.transition = ""; handle.style.transition = ""; }, 360);
@@ -343,10 +349,11 @@ function createSlider(meta, onChange) {
     track.style.transition = "width 0.35s cubic-bezier(0.22,1,0.36,1), transform 0.35s cubic-bezier(0.22,1,0.36,1)";
     track.style.width = ""; track.style.transform = "";
     setTimeout(() => { track.style.transition = ""; }, 360);
-    track.classList.remove("is-active", "is-dragging"); downPos = null; fineAnchor = null;
+    track.classList.remove("is-active", "is-dragging"); downPos = null; fineAnchor = null; downId = null;
   };
   track.addEventListener("pointerup", up);
   track.addEventListener("pointercancel", up);
+  track.addEventListener("lostpointercapture", up); // implicit capture loss ends the drag like a release — no stranded is-active/is-dragging state
   // Reveal the handle on hover — JS companion to the CSS :hover.
   wireHoverClass(track, render); // re-render the value-dodge with the real track width on first hover
   // Harden the dodge against type metrics it can't predict: recompute once layout +
@@ -669,18 +676,28 @@ const spinReset = (btn) => {
   }, 520);
 };
 
-function showToast(msg) {
-  const toast = document.querySelector(".toast");
-  if (!toast) return;
-  toast.textContent = msg; toast.classList.add("show");
-  clearTimeout((showToast as any)._t); (showToast as any)._t = setTimeout(() => toast.classList.remove("show"), 2200);
+// Toast — the kit's own feedback pill (copy / preset confirmations), portaled to
+// <body> bottom-centre so it works anywhere the panel is dropped, not only on a host
+// page that happens to have a .toast element. One shared node, tip-style visuals;
+// carries the anchor panel's winning scheme + live theme the way the tip does.
+let toastEl = null, toastTimer = 0;
+function showToast(msg, anchor?) {
+  if (!toastEl) { toastEl = el("div", "tw-toast tw-portal"); toastEl.setAttribute("role", "status"); document.body.appendChild(toastEl); }
+  toastEl.textContent = msg;
+  applyThemeVars(toastEl, anchor?.closest(".tw-panel")?._twTheme);
+  const scheme = anchor && (anchor.closest('[data-tw-scheme="light"]') ? "light" : anchor.closest('[data-tw-scheme="dark"]') ? "dark" : null);
+  if (scheme) toastEl.setAttribute("data-tw-scheme", scheme); else toastEl.removeAttribute("data-tw-scheme");
+  toastEl.classList.add("is-open");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove("is-open"), 1600);
 }
 // Hint tooltip — one shared, portaled bubble shown by a control's info marker on
 // hover/focus. Portaled to <body> so it clears the panel's overflow clip; sits
 // above its anchor, flipping below when there's no room. Pointer-transparent.
-let hintTip = null, hintTimer = 0;
+let hintTip = null, hintTimer = 0, hintAnchor = null;
+const onHintKey = (e) => { if (e.key === "Escape") hideHintNow(); }; // bound only while the tip is open — WCAG 1.4.13, the hover content is dismissable
+const hideHintNow = () => { clearTimeout(hintTimer); document.removeEventListener("keydown", onHintKey); if (hintTip) hintTip.classList.remove("is-open"); };
 function showHint(anchor, text, themeVars) {
-  if (!hintTip) { hintTip = el("div", "tw-tip"); hintTip.setAttribute("role", "tooltip"); document.body.appendChild(hintTip); }
+  if (!hintTip) { hintTip = el("div", "tw-tip tw-portal"); hintTip.setAttribute("role", "tooltip"); document.body.appendChild(hintTip); }
   clearTimeout(hintTimer);
   hintTip.textContent = text;
   applyThemeVars(hintTip, themeVars);
@@ -690,26 +707,33 @@ function showHint(anchor, text, themeVars) {
   // dark — see the scheme-resolution comment in tweaks.css).
   const scheme = anchor.closest('[data-tw-scheme="light"]') ? "light" : anchor.closest('[data-tw-scheme="dark"]') ? "dark" : null;
   if (scheme) hintTip.setAttribute("data-tw-scheme", scheme); else hintTip.removeAttribute("data-tw-scheme");
+  const wasOpen = hintTip.classList.contains("is-open");
   hintTip.style.visibility = "hidden"; hintTip.classList.add("is-open");
   const r = anchor.getBoundingClientRect(), w = hintTip.offsetWidth, h = hintTip.offsetHeight;
   const left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8);
   const top = r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8;
   hintTip.style.left = left + "px"; hintTip.style.top = top + "px"; hintTip.style.visibility = "";
+  document.addEventListener("keydown", onHintKey);
+  hintAnchor = anchor;
+  // Unmount watchdog (popover()'s pattern): a host removing the panel mid-hover would
+  // otherwise strand the open tip on screen. One rAF per frame, only while open.
+  if (!wasOpen) requestAnimationFrame(function watch() { if (!hintTip.classList.contains("is-open")) return; if (!hintAnchor.isConnected) return hideHintNow(); requestAnimationFrame(watch); });
 }
-function hideHint() { if (hintTip) hintTimer = setTimeout(() => hintTip.classList.remove("is-open"), 80); }
+function hideHint() { if (hintTip) hintTimer = setTimeout(() => { hintTip.classList.remove("is-open"); document.removeEventListener("keydown", onHintKey); }, 80); }
 // A control's `hint` becomes a visible ⓘ marker beside its label that reveals the
 // text in the tooltip on hover/focus — discoverable and keyboard-reachable, unlike
 // the old native `title`. Shared by the panel build (registerCond) and enhance().
-function addHintMarker(node: any, hint: string, themeVars?: any) {
+function addHintMarker(node: any, hint: string) {
   const label = node.querySelector(".tw-slider-label, .tw-row-label, .tw-select-label, .tw-color-label, .tw-gradient-label, .tw-radiogrid-label, .tw-field-label, .tw-folder-title, .tw-fps-label, .tw-plot-label") || node;
   const mark = el("button", "tw-hint", ICON_INFO); mark.type = "button"; mark.setAttribute("aria-label", hint);
-  const show = () => showHint(mark, hint, themeVars);
+  const show = () => showHint(mark, hint, mark.closest(".tw-panel")?._twTheme); // theme resolved at show time — setTheme() swaps the panel's _twTheme object, so a build-time capture would pin the old vars forever
   mark.addEventListener("pointerenter", show);
   mark.addEventListener("pointerleave", hideHint);
   mark.addEventListener("focus", show);
   mark.addEventListener("blur", hideHint);
   mark.addEventListener("pointerdown", (e) => e.stopPropagation()); // a press on the marker mustn't start a slider scrub or panel drag
-  mark.addEventListener("click", (e) => e.preventDefault());
+  mark.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); }); // the marker nests inside trigger/header buttons — its click mustn't toggle the parent
+  mark.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }); // keyboard activation stays on the marker too
   label.appendChild(mark);
 }
 async function copyText(text) {
@@ -744,6 +768,9 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const entries = []; // { target, key, set, get, def, path } — flattened across folders, for reset + persist
   const subTrees = new Set(); // the folder/tabs params sub-objects — set() refuses to overwrite one (doing so orphaned every child entry silently)
   const listeners = new Set<(p?: any, last?: any) => void>();
+  const cleanups: Array<() => void> = []; // every global attachment (document/window listeners, pending timers) registers its release here for destroy()
+  let destroyed = false; // flipped by destroy(): assemble() bails, the mutating API methods go silent
+  let liftSlot = null; // the placeholder a lifted panel leaves in its host slot — removed on destroy()
   let persist = () => {}; // reassigned below when opts.persist is set (debounced localStorage save)
   // Assigned by assemble() below. Declared here so the API returned synchronously can
   // forward to them even on the lazy path, where assemble() runs after modules load.
@@ -756,6 +783,8 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // `true` to key by the panel name). null disables both (existing callers unaffected).
   const persistKey = opts.persist ? `tw:${opts.persist === true ? name : opts.persist}` : null;
   const presetsKey = persistKey ? `${persistKey}:presets` : null;
+  const readStore = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
+  const writeStore = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   const panel = el("div", "tw-panel"); panel.dataset.mode = "inline";
   // Stop pointer events leaking past the panel to whatever's behind it (e.g. a
@@ -793,12 +822,18 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   header.append(titleBtn);
   if (filterOn) header.append(searchInput);
   if (opts.toolbar !== false) header.append(toolbar); // opts.toolbar:false → a bare panel (no copy/reset/presets), e.g. an embedded single-control demo
+  // The toolbar's handlers wire up in assemble() — until then (the lazy-chunk window on
+  // the split build) the buttons are honestly inert rather than silently dead.
+  for (const b of [copyBtn, resetBtn, presetsBtn, searchBtn]) if (b) b.disabled = true;
   // A header drag (floating mode) sets this so the click ending the drag doesn't collapse.
   let dragMoved = false;
   titleBtn.addEventListener("click", () => {
     if (dragMoved) { dragMoved = false; return; }
     const collapsed = panel.classList.toggle("is-collapsed");
     titleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    // A bottom-parked floating panel grows past the viewport when it expands — re-clamp
+    // once the 0.25s body collapse has settled and the height is real.
+    if (panel.dataset.mode === "floating") setTimeout(() => { if (panel.dataset.mode === "floating" && panel.isConnected) { clampPos(); apply(); } }, 270);
   });
   const body = el("div", "tw-body");
   const controls = el("div", "tw-controls");
@@ -809,6 +844,26 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // which escape to <body> and lose the panel's inherited vars — re-apply it on open.
   let themeVars = resolveTheme(opts.theme);
   applyThemeVars(panel, themeVars); panel._twTheme = themeVars;
+
+  // ── Floating position — seeded in the shell, so an opts.floating / persisted-position
+  // panel is fixed in place the moment tweaks() returns instead of jumping when the lazy
+  // chunks land. The drag wiring itself still lives in assemble(). ──
+  const draggable = opts.draggable !== false;
+  const MARGIN = 8, SNAP = 28; // px: viewport inset, and the drop distance within which the panel parks against an edge
+  const bounds = () => ({ maxX: Math.max(MARGIN, window.innerWidth - panel.offsetWidth - MARGIN), maxY: Math.max(MARGIN, window.innerHeight - panel.offsetHeight - MARGIN) });
+  const posKey = persistKey ? `${persistKey}:pos` : null;
+  const saved = (draggable || opts.floating) && posKey ? readStore(posKey) : null;
+  const start = saved || (typeof opts.floating === "object" ? opts.floating : null) || { x: 16, y: 16 };
+  let px = +start.x || 16, py = +start.y || 16;
+  const apply = () => { panel.style.left = px + "px"; panel.style.top = py + "px"; };
+  const clampPos = () => { const { maxX, maxY } = bounds(); px = clamp(px, MARGIN, maxX); py = clamp(py, MARGIN, maxY); };
+  if ((draggable || opts.floating) && (opts.floating || saved)) {
+    panel.dataset.mode = "floating"; clampPos(); apply();
+    // A position saved on a larger monitor restores fully off this viewport — re-clamp
+    // once the host has mounted the panel (offsetWidth is 0 until then, so the build-time
+    // clamp above can only pin the left/top edge into the viewport).
+    requestAnimationFrame(() => { if (!destroyed && panel.dataset.mode === "floating" && panel.isConnected) { clampPos(); apply(); } });
+  }
 
   // Per-control reset: double-click a control's label (or the slider's value
   // readout — its label is a pointer-events:none overlay) to revert just that
@@ -845,7 +900,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // is a static tooltip. registerCond wires whichever a control declared.
   const conditionals = [];
   const registerCond = (node, m) => {
-    if (m.hint) addHintMarker(node, m.hint, panel._twTheme);
+    if (m.hint) addHintMarker(node, m.hint);
     if (m.render || m.disabled != null) conditionals.push({ node, m });
   };
   const filterItems = [], filterFolders = []; // searchable index (opts.filter) keyed on each control's real label
@@ -891,6 +946,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // once — and is deferred behind panel.ready otherwise. tweaks() returns synchronously
   // either way: the panel shell + API exist immediately; lazy controls fill in on ready.
   const assemble = () => {
+  if (destroyed) return; // destroy() before the lazy chunks landed — nothing to build
   build(controls, metas, params);
 
   // Apply the conditionals now and on every change (a sibling's value can flip them).
@@ -933,10 +989,9 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // ── Persistence + named presets (opt-in via opts.persist) ──────────────────
   // The live values save to localStorage (debounced) and restore on build; presets
   // are named snapshots under "<key>:presets". Path-aware so folders round-trip.
-  const readStore = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
-  const writeStore = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
   const atPath = (obj, path) => path.reduce((o, k) => (o == null ? undefined : o[k]), obj);
-  const snapshot = () => JSON.parse(JSON.stringify(params, (k, v) => (k === "_last" ? undefined : v)));
+  const stripLast = function (k, v) { return k === "_last" && this === params ? undefined : v; }; // function, not arrow: `this` is the holder, so only the top-level changed-key channel strips — a folder child legitimately keyed "_last" survives
+  const snapshot = () => JSON.parse(JSON.stringify(params, stripLast));
   const applySnapshot = (snap, fire = true) => {
     if (!snap || typeof snap !== "object") return;
     for (const e of entries) { const v = atPath(snap, e.path); if (v !== undefined) { e.set(v); e.target[e.key] = e.get(); } }
@@ -944,7 +999,11 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   };
   if (persistKey) {
     let saveT; persist = () => { clearTimeout(saveT); saveT = setTimeout(() => writeStore(persistKey, snapshot()), 150); };
-    applySnapshot(readStore(persistKey), false); // restore last session quietly — the host reads params on init
+    cleanups.push(() => clearTimeout(saveT));
+    // Restore last session, notifying: on the lazy path assemble runs after tweaks()
+    // returned, so a host that already subscribed must hear the restored values (on the
+    // synchronous path nobody is subscribed yet, so the notify is free).
+    applySnapshot(readStore(persistKey));
   }
   listPresets = () => { const p = presetsKey ? readStore(presetsKey) : null; return Object.assign(Object.create(null), p && typeof p === "object" ? p : {}); }; // null-proto: a preset named "__proto__" is an ordinary key (a plain object's assignment wrote the prototype — savePreset claimed success while storing nothing, loadPreset applied Object.prototype)
   savePreset = (nm) => { if (!presetsKey || !nm) return false; const all = listPresets(); all[nm] = snapshot(); writeStore(presetsKey, all); return true; };
@@ -960,7 +1019,6 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // panel eases the rest of the way to a viewport edge when dropped near one (a gentle
   // magnetism), and the position persists to "<key>:pos" when persistence is on — so a
   // moved panel returns where the user left it.
-  const draggable = opts.draggable !== false;
   if (draggable || opts.floating) {
     if (draggable) {
       panel.dataset.draggable = "true"; // CSS grab cursor on the header — the affordance
@@ -970,13 +1028,6 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       const grabber = el("span", "tw-grabber"); grabber.setAttribute("aria-hidden", "true");
       header.prepend(grabber);
     }
-    const posKey = persistKey ? `${persistKey}:pos` : null;
-    const saved = posKey ? readStore(posKey) : null;
-    const startFloated = !!opts.floating || !!saved;
-    const start = saved || (typeof opts.floating === "object" ? opts.floating : null) || { x: 16, y: 16 };
-    let px = +start.x || 16, py = +start.y || 16;
-    const apply = () => { panel.style.left = px + "px"; panel.style.top = py + "px"; };
-    if (startFloated) { panel.dataset.mode = "floating"; apply(); }
     // Lift an inline panel into the floating layer at its current on-screen rect, so a
     // drag pops it out of flow in place rather than snapping to a corner. A same-size
     // placeholder stays behind in the old slot — without it the host container reflows
@@ -986,20 +1037,25 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       const r = panel.getBoundingClientRect();
       px = r.left; py = r.top;
       if (panel.parentNode) {
-        const slot = el("span", "tw-lift-slot");
-        slot.style.width = r.width + "px"; slot.style.height = r.height + "px";
-        slot.setAttribute("aria-hidden", "true");
-        panel.before(slot);
+        liftSlot = el("span", "tw-lift-slot");
+        liftSlot.style.width = r.width + "px"; liftSlot.style.height = r.height + "px";
+        liftSlot.setAttribute("aria-hidden", "true");
+        panel.before(liftSlot);
       }
+      // Portal to <body>: left in its slot, any transformed/filter/contain ancestor would
+      // become the fixed panel's containing block (the bug class the popovers already
+      // solved by portaling). The inline --tw-* theme vars ride along on the node; the
+      // scheme scope doesn't — copy the WINNING scheme, not the nearest (popover()'s idiom).
+      const scheme = panel.closest('[data-tw-scheme="light"]') ? "light" : panel.closest('[data-tw-scheme="dark"]') ? "dark" : null;
+      if (scheme) panel.setAttribute("data-tw-scheme", scheme); else panel.removeAttribute("data-tw-scheme");
+      document.body.appendChild(panel);
       panel.dataset.mode = "floating"; apply();
     };
 
-    const MARGIN = 8, SNAP = 28; // px: viewport inset, and the drop distance within which the panel parks against an edge
-    const bounds = () => ({ maxX: Math.max(MARGIN, window.innerWidth - panel.offsetWidth - MARGIN), maxY: Math.max(MARGIN, window.innerHeight - panel.offsetHeight - MARGIN) });
     let dragId = null, sx = 0, sy = 0, ox = 0, oy = 0;
     header.addEventListener("pointerdown", (e) => {
       // Let the toolbar buttons and any inputs work; drag from anywhere else on the header.
-      if (e.button !== 0 || e.target.closest(".tw-toolbar, input, textarea, select")) return;
+      if (e.button !== 0 || dragId !== null || e.target.closest(".tw-toolbar, input, textarea, select")) return;
       dragId = e.pointerId; sx = e.clientX; sy = e.clientY; dragMoved = false;
       panel.classList.add("is-grabbing"); // press feedback: brighten the grabber the instant it's grabbed, before any move — matters on touch, where there's no hover to reveal it first
       // Regrab mid–edge-snap: pick the panel up where it visually is (the eased,
@@ -1033,23 +1089,27 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
         const { maxX, maxY } = bounds();
         if (px <= MARGIN + SNAP) px = MARGIN; else if (px >= maxX - SNAP) px = maxX;
         if (py <= MARGIN + SNAP) py = MARGIN; else if (py >= maxY - SNAP) py = maxY;
-        panel.style.transition = "left 0.32s var(--tw-ease-spring), top 0.32s var(--tw-ease-spring)";
+        if (!REDUCE_MOTION.matches) { // the glide is inline style, out of reach of the CSS reduced-motion kill-switch — park instantly instead
+          panel.style.transition = "left 0.32s var(--tw-ease-spring), top 0.32s var(--tw-ease-spring)";
+          setTimeout(() => { panel.style.transition = ""; }, 340);
+        }
         apply();
-        setTimeout(() => { panel.style.transition = ""; }, 340);
         if (posKey) writeStore(posKey, { x: px, y: py });
       }
       panel.classList.remove("is-dragging", "is-grabbing");
     };
     header.addEventListener("pointerup", endDrag);
     header.addEventListener("pointercancel", endDrag);
+    header.addEventListener("lostpointercapture", endDrag); // implicit capture loss mid-drag ends it like a release
     // Keep a floated panel inside the viewport as the window resizes. Self-cleans on
     // the first resize after the panel leaves the DOM (this listener leaked per
     // draggable panel, holding the panel alive — the slider's resize pattern).
     const onWinResize = () => {
       if (!panel.isConnected) return window.removeEventListener("resize", onWinResize);
-      if (panel.dataset.mode === "floating") { const { maxX, maxY } = bounds(); px = clamp(px, MARGIN, maxX); py = clamp(py, MARGIN, maxY); apply(); }
+      if (panel.dataset.mode === "floating") { clampPos(); apply(); }
     };
     window.addEventListener("resize", onWinResize);
+    cleanups.push(() => window.removeEventListener("resize", onWinResize));
   }
 
   if (presetsBtn) {
@@ -1067,13 +1127,13 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       for (const nm of names) {
         const row = el("div", "tw-presets-row");
         const load = el("button", "tw-presets-load"); load.type = "button"; load.textContent = nm;
-        load.addEventListener("click", () => { loadPreset(nm); menuPop.close(); showToast(`Loaded “${nm}”`); });
+        load.addEventListener("click", () => { loadPreset(nm); menuPop.close(); showToast(`Loaded “${nm}”`, panel); });
         const del = el("button", "tw-presets-del", ICON_X); del.type = "button"; del.setAttribute("aria-label", `Delete preset ${nm}`);
         del.addEventListener("click", (e) => { e.stopPropagation(); deletePreset(nm); renderList(); });
         row.append(load, del); list.append(row);
       }
     };
-    const doSave = () => { const nm = input.value.trim(); if (!nm) { input.focus(); return; } savePreset(nm); input.value = ""; renderList(); showToast(`Saved “${nm}”`); };
+    const doSave = () => { const nm = input.value.trim(); if (!nm) { input.focus(); return; } savePreset(nm); input.value = ""; renderList(); showToast(`Saved “${nm}”`, panel); };
     // The shared popover shell again — portaled, theme-carried, outside/Esc/scroll-away
     // close, single-open with the editors. align:"end" hangs it off the button's right
     // edge (it sits at the panel's right corner).
@@ -1086,9 +1146,9 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   }
 
   copyBtn.addEventListener("click", async () => {
-    const ok = await copyText(JSON.stringify(params, (k, v) => (k === "_last" ? undefined : v), 2));
-    if (ok) { flashCopied(copyBtn); showToast(`${name} values copied`); }
-    else showToast("Copy failed");
+    const ok = await copyText(JSON.stringify(params, stripLast, 2));
+    if (ok) { flashCopied(copyBtn); showToast(`${name} values copied`, panel); }
+    else showToast("Copy failed", panel);
   });
   // A host can supply its own reset (e.g. restore real app defaults + rebuild);
   // otherwise reset each control to the default it was built with. The icon spins
@@ -1105,10 +1165,21 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   if (opts.onEditStart || opts.onEditEnd) {
     const DRAG_SEL = ".tw-slider, .tw-num-grab, .tw-pad, .tw-wg-area, .tw-wg-hue, .tw-wg-alpha, .tw-bezier-handle, .tw-gradient-bar, .tw-gradient-stop";
     let editing = false;
-    panel.addEventListener("pointerdown", (e) => { if (!editing && e.target.closest(DRAG_SEL)) { editing = true; opts.onEditStart && opts.onEditStart(); } });
-    const endEdit = () => { if (editing) { editing = false; opts.onEditEnd && opts.onEditEnd(); } };
-    panel.addEventListener("pointerup", endEdit);
-    panel.addEventListener("pointercancel", endEdit);
+    // The end listeners sit on document (capture) only for the edit's duration: a drag on
+    // a popover surface portaled to <body> (the colour plane, a gradient stop) releases
+    // there, where the panel's own pointerup listener would never hear it.
+    const endEdit = () => {
+      document.removeEventListener("pointerup", endEdit, true); document.removeEventListener("pointercancel", endEdit, true);
+      if (editing) { editing = false; opts.onEditEnd && opts.onEditEnd(); }
+    };
+    const editDown = (e) => {
+      if (editing || !e.target.closest(DRAG_SEL)) return;
+      editing = true; opts.onEditStart && opts.onEditStart();
+      document.addEventListener("pointerup", endEdit, true); document.addEventListener("pointercancel", endEdit, true);
+    };
+    panel.addEventListener("pointerdown", editDown);
+    panel._twEditPointer = editDown; // popover() relays pointerdowns on its portaled surfaces here
+    cleanups.push(endEdit);
   }
 
   // ── Undo / redo (opts.undo) — a debounced history of snapshots. Cmd/Ctrl-Z undoes,
@@ -1140,7 +1211,9 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       else if (k === "y") { e.preventDefault(); redo(); }
     };
     document.addEventListener("keydown", onUndoKey);
+    cleanups.push(() => document.removeEventListener("keydown", onUndoKey));
   }
+  for (const b of [copyBtn, resetBtn, presetsBtn, searchBtn]) if (b) b.disabled = false; // the toolbar's handlers are live now
   }; // end assemble
 
   // The API is built + returned synchronously. on/set/reset/setTheme operate on the
@@ -1148,29 +1221,63 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // fills in (no-ops until then — only reachable on the lazy path, before ready).
   const api: any = {
     el: panel, params,
-    on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    on(fn) { if (destroyed) return () => {}; listeners.add(fn); return () => listeners.delete(fn); },
     set(key, v) {
-      const e = entries.find((x) => x.target === params && x.key === key);
-      const prev = params[key];
-      if (e) { e.set(v); params[key] = e.get(); }
+      if (destroyed) return;
+      const parts = String(key).split(".");
+      if (parts.some((p) => p === "__proto__" || p === "constructor" || p === "prototype")) return console.warn(`[tweaks] set("${key}") ignored — reserved key`); // params is an object-as-map; never write through to the prototype
+      let e;
+      if (parts.length > 1) {
+        // Dotted path ("folder.child", "tabs.page.child") — walk the folder/tabs
+        // subtrees to the owning target, then match the leaf there.
+        let t: any = params;
+        for (let i = 0; i < parts.length - 1 && t; i++) { t = t[parts[i]]; if (!subTrees.has(t)) t = null; }
+        e = t && entries.find((x) => x.target === t && x.key === parts[parts.length - 1]);
+        if (!e) return console.warn(`[tweaks] set("${key}") — no control at that path`);
+      } else {
+        // Bare key — a unique match anywhere reaches nested controls without a path;
+        // ambiguity warns instead of guessing (and instead of minting an orphan top-level key).
+        const matches = entries.filter((x) => x.key === key);
+        if (matches.length > 1) return console.warn(`[tweaks] set("${key}") is ambiguous — ${matches.length} controls share that key; use a dotted path (e.g. "${matches[0].path.join(".")}")`);
+        e = matches[0];
+      }
+      const target = e ? e.target : params, leaf = e ? e.key : key;
+      const prev = target[leaf];
+      if (e) { e.set(v); target[leaf] = e.get(); }
       else if (subTrees.has(params[key])) return console.warn(`[tweaks] set("${key}") ignored — it's a folder/tabs group; set its children instead`); // overwriting the subtree would silently orphan every child value
-      else params[key] = v;
-      if (!valueChanged(prev, params[key])) return; // a no-change set doesn't notify — the guard that keeps a store-sync listener from echoing forever
-      params._last = key; notify(); // stamp the changed key, so on((p, last)) sees programmatic sets the same as control edits
+      else params[key] = v; // bag passthrough — hosts park free keys on params
+      if (!valueChanged(prev, target[leaf])) return; // a no-change set doesn't notify — the guard that keeps a store-sync listener from echoing forever
+      params._last = leaf; notify(); // stamp the changed key, so on((p, last)) sees programmatic sets the same as control edits
     },
-    reset() { resetBtn.click(); },
+    reset() { if (!destroyed) resetBtn.click(); },
     // Live theming — re-applies --tw-* vars to the panel (and future popovers). Clears
     // the prior theme first, so setTheme(null) reverts to the default monochrome look.
-    setTheme(theme) { if (themeVars) for (const k in themeVars) panel.style.removeProperty(k); themeVars = resolveTheme(theme); panel._twTheme = themeVars; applyThemeVars(panel, themeVars); window.dispatchEvent(new Event("tw-retheme")); },
+    setTheme(theme) { if (destroyed) return; if (themeVars) for (const k in themeVars) panel.style.removeProperty(k); themeVars = resolveTheme(theme); panel._twTheme = themeVars; applyThemeVars(panel, themeVars); window.dispatchEvent(new Event("tw-retheme")); },
     // Presets API (no-ops without opts.persist). Names are arbitrary strings.
-    savePreset: (nm) => savePreset(nm), loadPreset: (nm) => loadPreset(nm), deletePreset: (nm) => deletePreset(nm), presets: () => Object.keys(listPresets()),
-    undo: () => undo(), redo: () => redo(), // no-ops without opts.undo
+    savePreset: (nm) => !destroyed && savePreset(nm), loadPreset: (nm) => !destroyed && loadPreset(nm), deletePreset: (nm) => { if (!destroyed) deletePreset(nm); }, presets: () => (destroyed ? [] : Object.keys(listPresets())),
+    undo: () => { if (!destroyed) undo(); }, redo: () => { if (!destroyed) redo(); }, // no-ops without opts.undo
+    // Teardown: close any open portaled surface, release every global attachment, pull
+    // the panel (and the lift placeholder) out of the DOM, and inert the API. Safe to
+    // call before ready resolves — assemble() sees the flag and bails.
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      closeActivePopover(); // popovers are globally single-open, so whichever is up closes (idempotent if it isn't this panel's)
+      hideHintNow();
+      for (const fn of cleanups.splice(0)) { try { fn(); } catch {} }
+      listeners.clear();
+      if (liftSlot) { liftSlot.remove(); liftSlot = null; }
+      panel.remove();
+    },
   };
   // Lazy controls: if the schema needs feature modules not yet loaded, assemble once
   // they resolve and surface that on panel.ready / api.ready; otherwise assemble now
   // (synchronous — the monolith and warmed-up split builds always take this path).
   const pending = ensureForMetas(metas);
-  if (pending) { api.ready = panel.ready = pending.then(assemble).then(() => api); }
+  if (pending) {
+    api.ready = panel.ready = pending.then(assemble).then(() => api);
+    api.ready.catch(() => {}); // a handled fork — no unhandled-rejection noise when a chunk fails, while ready still rejects for hosts that await it
+  }
   else { assemble(); api.ready = panel.ready = Promise.resolve(api); }
   return api as Panel;
 }
@@ -1188,8 +1295,8 @@ const dataMeta = (host) => {
   if (type === "radiogrid") { const options = (d.options || "").split(",").map((s) => s.trim()).filter(Boolean); return { type, key: "v", label, options, value: d.value ?? options[0], cols: d.cols != null ? +d.cols : undefined }; }
   if (type === "list") { const options = (d.options || "").split(",").map((s) => s.trim()).filter(Boolean); return { type, key: "v", label, options, value: d.value ?? options[0] }; }
   if (type === "color") return { type, key: "v", label, value: d.value || "#7c5cff" };
-  if (type === "button") return { type, key: "v", label, action: () => showToast(`${label} pressed`) };
-  if (type === "buttongroup") return { type, key: "v", label, buttons: (d.buttons || "").split(",").map((s) => s.trim()).filter(Boolean).map((lab) => ({ label: lab, action: () => showToast(`${lab} pressed`) })) };
+  if (type === "button") return { type, key: "v", label, action: () => showToast(`${label} pressed`, host) };
+  if (type === "buttongroup") return { type, key: "v", label, buttons: (d.buttons || "").split(",").map((s) => s.trim()).filter(Boolean).map((lab) => ({ label: lab, action: () => showToast(`${lab} pressed`, host) })) };
   if (type === "separator") return { type, key: "v", label };
   if (type === "number") return { type, key: "v", label, value: +(d.value ?? 0), min: d.min != null ? +d.min : undefined, max: d.max != null ? +d.max : undefined, step: +(d.step || 1) };
   if (type === "text") return { type, key: "v", label, value: d.value ?? "", placeholder: d.placeholder, rows: d.rows != null ? +d.rows : undefined };
@@ -1240,8 +1347,8 @@ export async function enhance(root: Document | Element = document): Promise<void
       copyBtn.addEventListener("click", async () => {
         const vals = {}; for (const t of live()) vals[t.key] = t.ctrl.get();
         const ok = await copyText(JSON.stringify(vals, null, 2));
-        if (ok) { flashCopied(copyBtn); showToast(`${name} values copied`); }
-        else showToast("Copy failed");
+        if (ok) { flashCopied(copyBtn); showToast(`${name} values copied`, panel); }
+        else showToast("Copy failed", panel);
       });
       resetBtn.addEventListener("click", () => {
         spinReset(resetBtn);
@@ -1264,7 +1371,7 @@ export async function enhance(root: Document | Element = document): Promise<void
     .filter((x) => x.meta);
   hosts.forEach(({ host }) => host.setAttribute("data-tw-bound", ""));
   const pend = ensureForMetas(hosts.map((x) => x.meta));
-  if (pend) await pend;
+  if (pend) await pend.catch(() => {}); // a failed chunk degrades to skipping its controls (createControl finds no constructor), not an unhandled rejection out of the auto-run
   for (const { host, meta } of hosts) {
     const ctrl = createControl(meta, (v) => (host.dataset.value = v));
     if (ctrl) { host.append(ctrl.el); if (host.dataset.hint) addHintMarker(ctrl.el, host.dataset.hint); host._tw = { ctrl, def: meta.value, key: meta.label, host }; }
