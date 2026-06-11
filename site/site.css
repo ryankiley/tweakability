@@ -13,7 +13,22 @@
   --site-faint: #6f6f6f;
   --site-accent: #a08aff;
   --site-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* Motion vocabulary borrowed from the design system tweakability spun out of. */
+  --site-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --site-dur-fast: 160ms;
+  --site-dur-base: 250ms;
 }
+
+/* Inverted, high-contrast selection (the design system's house style). */
+::selection { background: var(--site-text); color: var(--site-bg); }
+
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--site-text);
+  outline-offset: 2px;
+}
+
+/* Cross-document page fade (progressive enhancement; the rail stays put). */
+@view-transition { navigation: auto; }
 
 * { box-sizing: border-box; }
 
@@ -27,8 +42,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Prose links: a faded underline that fills in on hover (portfolio house style). */
 a { color: var(--site-accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+.doc a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+  transition: text-decoration-color var(--site-dur-base) var(--site-ease-out);
+}
+.doc a:hover { text-decoration-color: currentColor; }
+.doc .doc-footnav a { text-decoration: none; }
 
 /* ── Layout ── */
 .layout { display: flex; max-width: 1160px; margin: 0 auto; }
@@ -51,6 +75,7 @@ a:hover { text-decoration: underline; }
 .sb-link {
   display: block; padding: 5px 10px; border-radius: 8px;
   color: var(--site-muted); font-size: 14px;
+  transition: color var(--site-dur-fast) var(--site-ease-out), background var(--site-dur-fast) var(--site-ease-out);
 }
 .sb-link:hover { color: var(--site-text); background: rgba(255, 255, 255, 0.04); text-decoration: none; }
 .sb-link.sb-current { color: var(--site-text); background: rgba(255, 255, 255, 0.07); }
@@ -60,14 +85,27 @@ a:hover { text-decoration: underline; }
   padding: 44px 44px 96px;
 }
 
+/* Staggered entrance — content rises in on load (design-system signature). */
+@keyframes site-rise { from { opacity: 0; transform: translateY(10px); } }
+.doc > * { animation: site-rise 420ms var(--site-ease-out) both; }
+.doc > :nth-child(2) { animation-delay: 60ms; }
+.doc > :nth-child(3) { animation-delay: 110ms; }
+.doc > :nth-child(n + 4) { animation-delay: 150ms; }
+@media (prefers-reduced-motion: reduce) {
+  .doc > * { animation: none; }
+}
+
 /* ── Typography ── */
-.doc h1 { margin: 0 0 14px; font-size: 1.9rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
-.doc h2 { margin: 52px 0 10px; font-size: 1.3rem; font-weight: 600; letter-spacing: -0.015em; }
-.doc h3 { margin: 32px 0 8px; font-size: 1.05rem; font-weight: 600; }
-.doc p { margin: 0 0 14px; color: var(--site-muted); }
+/* Heading craft from the design system: fluid clamp() sizing, balanced wrapping,
+ * variable-font weights a notch under bold (440/560 — SF Pro and Sans Flex both
+ * interpolate; static fallbacks snap to the nearest face). */
+.doc h1 { margin: 0 0 14px; font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.1rem); font-weight: 440; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
+.doc h2 { margin: 52px 0 10px; font-size: 1.3rem; font-weight: 560; letter-spacing: -0.015em; text-wrap: balance; }
+.doc h3 { margin: 32px 0 8px; font-size: 1.05rem; font-weight: 560; }
+.doc p { margin: 0 0 14px; color: var(--site-muted); text-wrap: pretty; }
 .doc p strong, .doc li strong { color: var(--site-text); font-weight: 600; }
 .doc ul, .doc ol { margin: 0 0 14px; padding-left: 22px; color: var(--site-muted); }
-.doc li { margin: 4px 0; }
+.doc li { margin: 4px 0; text-wrap: pretty; }
 .doc code {
   font-family: var(--site-mono); font-size: 0.85em;
   background: rgba(255, 255, 255, 0.06); border: 1px solid var(--site-border-soft);
@@ -82,7 +120,7 @@ a:hover { text-decoration: underline; }
 
 /* Hero (landing page) */
 .hero { margin: 8px 0 36px; }
-.hero h1 { font-size: 2.3rem; margin-bottom: 12px; }
+.hero h1 { font-size: clamp(2.1rem, 1.5rem + 2.4vw, 2.9rem); margin-bottom: 12px; line-height: 1.08; }
 .hero p { max-width: 54ch; font-size: 16px; }
 .hero-meta { display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
 .hero-pill {
@@ -116,15 +154,44 @@ a:hover { text-decoration: underline; }
   margin: 0; padding: 15px 18px; overflow-x: auto;
   background: #191a21; border: 1px solid #262833; border-radius: 12px;
   font-family: var(--site-mono); font-size: 12.5px; line-height: 1.65; color: #c8cad3;
+  font-variant-numeric: tabular-nums;
 }
+
+/* Copy button — the kit's own copy ⇄ check icon swap (opacity + scale + blur
+ * cross-fade), revealed on hover, with an inverted-ink tooltip from aria-label. */
 .ex-copy {
-  position: absolute; top: 8px; right: 8px; padding: 3px 10px;
-  font: 600 11px/1.6 inherit; font-family: inherit; color: var(--site-muted);
-  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--site-border);
-  border-radius: 7px; cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s;
+  position: absolute; top: 8px; right: 8px;
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  color: var(--site-muted);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--site-border);
+  border-radius: 8px; cursor: pointer; opacity: 0;
+  transition: opacity var(--site-dur-fast) var(--site-ease-out), color var(--site-dur-fast) var(--site-ease-out);
 }
 .ex-codewrap:hover .ex-copy, .ex-copy:focus-visible { opacity: 1; }
 .ex-copy:hover { color: var(--site-text); }
+.ex-copy.is-copied { color: #9ece6a; opacity: 1; }
+.ex-copy-icons { position: relative; width: 14px; height: 14px; }
+.ex-copy-icons svg {
+  position: absolute; inset: 0; width: 14px; height: 14px;
+  transition: opacity var(--site-dur-base) var(--site-ease-out),
+              transform var(--site-dur-base) var(--site-ease-out),
+              filter var(--site-dur-base) var(--site-ease-out);
+}
+.ex-copy-check { opacity: 0; transform: scale(0.25); filter: blur(2px); }
+.ex-copy.is-copied .ex-copy-copy { opacity: 0; transform: scale(0.25); filter: blur(2px); }
+.ex-copy.is-copied .ex-copy-check { opacity: 1; transform: none; filter: none; }
+.ex-copy::after {
+  content: attr(aria-label);
+  position: absolute; top: calc(100% + 6px); right: 0;
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  font: 600 11px/1.5 inherit; font-family: inherit;
+  background: var(--site-text); color: var(--site-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  opacity: 0; transform: translateY(4px) scale(0.96); transform-origin: top right;
+  pointer-events: none;
+  transition: opacity var(--site-dur-base) var(--site-ease-out), transform var(--site-dur-base) var(--site-ease-out);
+}
+.ex-copy:hover::after, .ex-copy:focus-visible::after { opacity: 1; transform: none; }
 .ex-note { font-size: 12.5px; color: var(--site-faint); margin-top: -6px; }
 
 /* ── Highlighter tokens — vivid, anchored on the kit's violet ── */
