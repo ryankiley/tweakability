@@ -6,11 +6,10 @@
  *                       synchronous) — the drop-in / copyable build, no bundler needed.
  *   • dist/tweaks.css   minified panel CSS.
  *   • dist/types/       .d.ts declarations (tsc) — consumers get full types.
- *   • dist/index.html   the demo (GitHub Pages root).
+ *   • dist/*.html       the docs/examples site (GitHub Pages root) — see site/.
  * TW_SPLIT is an esbuild `define` that picks the split vs inlined code path in core.ts.
  */
-import { mkdir, rm, cp, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { mkdir, rm, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
@@ -57,7 +56,11 @@ try {
   console.warn("⚠ tsc reported type errors (declarations emitted where possible):", String(e.stdout || e.message || "").split("\n").slice(0, 4).join(" "));
 }
 
-// 5) demo → dist/index.html (GitHub Pages serves dist/)
-if (existsSync(p("demo/index.html"))) await cp(p("demo/index.html"), p("dist/index.html"));
+// 5) docs site → dist/*.html + site.css/site.js (GitHub Pages serves dist/). The
+// generator imports site/pages/*.mjs raw — they never pass through esbuild (each
+// example's run function is toString()-serialized into both the snippet and the page
+// script, so transpiling would break snippet/runtime parity).
+const { buildSite } = await import("./site/build-site.mjs");
+await buildSite({ outDir: p("dist"), esbuild });
 
 console.log("Built tweakability → dist/");

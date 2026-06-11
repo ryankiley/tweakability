@@ -1,0 +1,181 @@
+/* Tweakability docs shell. Dark monochrome to match the kit (values lifted from the
+ * demo + tweaks.css register). Class prefixes: sb- (sidebar), doc- (content),
+ * ex- (examples), tok- (highlighter), topbar- (mobile bar) — never tw-*. */
+
+:root {
+  color-scheme: dark;
+  --site-bg: #161616;
+  --site-panel: #1b1b1b;
+  --site-border: #262626;
+  --site-border-soft: #222222;
+  --site-text: #ededed;
+  --site-muted: #9a9a9a;
+  --site-faint: #6f6f6f;
+  --site-accent: #a08aff;
+  --site-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--site-bg);
+  color: var(--site-text);
+  font-family: "Google Sans Flex", system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--site-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ── */
+.layout { display: flex; max-width: 1160px; margin: 0 auto; }
+
+.sb {
+  position: sticky; top: 0; align-self: flex-start;
+  width: 230px; flex: none; height: 100vh; overflow-y: auto;
+  padding: 26px 18px 40px;
+}
+.sb-brand { margin: 2px 10px 22px; }
+.sb-brand a {
+  color: var(--site-text); font-size: 17px; font-weight: 600; letter-spacing: -0.02em;
+}
+.sb-brand a:hover { text-decoration: none; }
+.sb-group { margin-bottom: 20px; }
+.sb-section {
+  margin: 0 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--site-faint);
+}
+.sb-link {
+  display: block; padding: 5px 10px; border-radius: 8px;
+  color: var(--site-muted); font-size: 14px;
+}
+.sb-link:hover { color: var(--site-text); background: rgba(255, 255, 255, 0.04); text-decoration: none; }
+.sb-link.sb-current { color: var(--site-text); background: rgba(255, 255, 255, 0.07); }
+
+.doc {
+  flex: 1; min-width: 0; max-width: 780px;
+  padding: 44px 44px 96px;
+}
+
+/* ── Typography ── */
+.doc h1 { margin: 0 0 14px; font-size: 1.9rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+.doc h2 { margin: 52px 0 10px; font-size: 1.3rem; font-weight: 600; letter-spacing: -0.015em; }
+.doc h3 { margin: 32px 0 8px; font-size: 1.05rem; font-weight: 600; }
+.doc p { margin: 0 0 14px; color: var(--site-muted); }
+.doc p strong, .doc li strong { color: var(--site-text); font-weight: 600; }
+.doc ul, .doc ol { margin: 0 0 14px; padding-left: 22px; color: var(--site-muted); }
+.doc li { margin: 4px 0; }
+.doc code {
+  font-family: var(--site-mono); font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--site-border-soft);
+  border-radius: 5px; padding: 1px 5px; color: #d8d4f0;
+}
+.doc pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+.doc table { border-collapse: collapse; width: 100%; margin: 18px 0 22px; font-size: 13.5px; }
+.doc th { text-align: left; font-weight: 600; color: var(--site-text); padding: 7px 12px 7px 0; border-bottom: 1px solid var(--site-border); }
+.doc td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--site-border-soft); color: var(--site-muted); vertical-align: top; }
+.doc td:first-child { white-space: nowrap; }
+
+/* Hero (landing page) */
+.hero { margin: 8px 0 36px; }
+.hero h1 { font-size: 2.3rem; margin-bottom: 12px; }
+.hero p { max-width: 54ch; font-size: 16px; }
+.hero-meta { display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+.hero-pill {
+  font-size: 12.5px; color: var(--site-muted); border: 1px solid var(--site-border);
+  border-radius: 999px; padding: 4px 12px; background: var(--site-panel);
+}
+
+/* ── Examples ── */
+/* One stage per example: the bordered container holds BOTH the demo surface and the
+ * panel, so the panel reads as living inside the scene it controls. */
+.ex { margin: 0 0 56px; }
+.ex-live {
+  display: flex; gap: 20px; align-items: stretch; margin: 18px 0; padding: 18px;
+  border-radius: 16px; background: var(--site-panel); border: 1px solid var(--site-border);
+}
+.ex-target {
+  flex: 1; min-width: 0; min-height: 220px; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; padding: 8px;
+  border-radius: 10px;
+}
+.ex-mount { flex: none; align-self: flex-start; } /* sizes to the panel's own 248px */
+.ex-live-solo { justify-content: center; }
+.ex-live-solo .ex-mount { align-self: auto; }
+.ex-live-markup { display: block; }
+.ex-live-markup .ex-target { display: block; min-height: 0; padding: 0; }
+
+.ex-codewrap { position: relative; margin: 14px 0; }
+.ex-code {
+  margin: 0; padding: 15px 18px; overflow-x: auto;
+  background: #191a21; border: 1px solid #262833; border-radius: 12px;
+  font-family: var(--site-mono); font-size: 12.5px; line-height: 1.65; color: #c8cad3;
+}
+.ex-copy {
+  position: absolute; top: 8px; right: 8px; padding: 3px 10px;
+  font: 600 11px/1.6 inherit; font-family: inherit; color: var(--site-muted);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--site-border);
+  border-radius: 7px; cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s;
+}
+.ex-codewrap:hover .ex-copy, .ex-copy:focus-visible { opacity: 1; }
+.ex-copy:hover { color: var(--site-text); }
+.ex-note { font-size: 12.5px; color: var(--site-faint); margin-top: -6px; }
+
+/* ── Highlighter tokens — vivid, anchored on the kit's violet ── */
+.tok-cm { color: #6c7396; font-style: italic; }
+.tok-str { color: #9ece6a; }
+.tok-num { color: #ff9e64; }
+.tok-kw { color: #bb9af7; }
+.tok-fn { color: #7aa2f7; }
+.tok-prop { color: #7dcfff; }
+.tok-key { color: #73daca; }
+.tok-tag { color: #f7768e; }
+.tok-attr { color: #bb9af7; }
+.tok-pn { color: #8a8fa3; }
+
+/* ── Prev / next footer ── */
+.doc-footnav {
+  display: flex; justify-content: space-between; gap: 14px;
+  margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--site-border);
+}
+.doc-footnav a {
+  display: flex; flex-direction: column; gap: 2px; max-width: 46%;
+  color: var(--site-text); font-weight: 500; font-size: 14.5px;
+}
+.doc-footnav a:hover { text-decoration: none; color: var(--site-accent); }
+.doc-footnav a span { font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--site-faint); }
+.doc-footnav .fn-next { text-align: right; margin-left: auto; }
+
+/* ── Mobile ── */
+.topbar { display: none; }
+@media (max-width: 800px) {
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 50; padding: 10px 14px;
+    background: rgba(22, 22, 22, 0.92); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--site-border);
+  }
+  .topbar-menu {
+    display: grid; place-items: center; width: 34px; height: 34px;
+    color: var(--site-text); background: none; border: 1px solid var(--site-border);
+    border-radius: 8px; cursor: pointer;
+  }
+  .topbar-brand { color: var(--site-text); font-weight: 600; letter-spacing: -0.02em; font-size: 16px; }
+
+  .layout { display: block; }
+  .sb {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 60;
+    height: 100dvh; width: 250px; background: #191919;
+    border-right: 1px solid var(--site-border);
+    transform: translateX(-102%); transition: transform 0.22s ease;
+  }
+  body.nav-open .sb { transform: none; box-shadow: 24px 0 60px rgba(0, 0, 0, 0.45); }
+
+  .doc { padding: 24px 18px 72px; }
+  .ex-live { flex-direction: column; }
+  .ex-mount { align-self: center; }
+}

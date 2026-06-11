@@ -43,8 +43,8 @@ npm run build      # → dist/
 ```
 
 `dist/` holds the split chunks, the single file, the CSS, the type declarations, and the
-demo (`index.html`) — all built from the one source tree in `src/`. `npm run serve` builds
-and serves it on :4330.
+docs/examples site (one page per control category, every control live) — all built from
+the one source tree in `src/` + `site/`. `npm run serve` builds and serves it on :4330.
 
 ## Layout
 
@@ -54,6 +54,9 @@ and serves it on :4330.
   `controls/*.ts` (the heavy controls, dynamic-imported on first use).
 - `src/wide-gamut.ts` — the OKLCH / wide-gamut colour engine.
 - `src/tweaks.css` — panel styling, entirely on `--tw-*` custom properties.
+- `site/` — the docs/examples site: `pages/*.mjs` (one module per page; each example's
+  code is executed *and* displayed from the same source, so snippets can't drift) and
+  `build-site.mjs` (the zero-dependency generator that assembles them into `dist/`).
 
 ## Credits
 

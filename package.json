@@ -17,7 +17,10 @@
     "./css": "./dist/tweaks.css"
   },
   "files": [
-    "dist",
+    "dist/tweaks",
+    "dist/tweaks.js",
+    "dist/tweaks.css",
+    "dist/types",
     "src",
     "THIRD-PARTY-NOTICES.md"
   ],
