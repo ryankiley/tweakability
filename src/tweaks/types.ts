@@ -23,7 +23,7 @@ export interface ControlOptions {
 
 /** The verbose object forms a schema value can take: `{ type: "…", … }`. */
 export type SchemaObject =
-  | { type: "slider"; value?: number; min?: number; max?: number; step?: number; soft?: boolean; alt?: boolean }
+  | { type: "slider"; value?: number; min?: number; max?: number; step?: number; soft?: boolean }
   | { type: "number"; value?: number; min?: number; max?: number; step?: number; soft?: boolean }
   | { type: "checkbox"; value?: boolean }
   | { type: "list"; options: Option[]; value?: string }
@@ -74,6 +74,8 @@ export interface Theme {
   surface?: string; surfaceHover?: string; surfaceActive?: string; surfaceSubtle?: string;
   /** Hairline border and its hover step. */
   border?: string; borderHover?: string;
+  /** Text-selection highlight wash. */
+  selection?: string;
   /** Text tones — panel title, section heading, primary value text, control label, and the muted / faint / focus tones. */
   title?: string; section?: string; text?: string; label?: string; textMuted?: string; textFaint?: string; focus?: string;
   /** Copy-confirmation accent. */

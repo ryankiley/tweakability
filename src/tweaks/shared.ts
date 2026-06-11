@@ -107,7 +107,7 @@ const THEME_ALIASES = {
   // colour — backdrops
   accent: "--tw-accent", base: "--tw-base", dropdownBg: "--tw-dropdown-bg",
   surface: "--tw-surface", surfaceHover: "--tw-surface-hover", surfaceActive: "--tw-surface-active", surfaceSubtle: "--tw-surface-subtle",
-  border: "--tw-border", borderHover: "--tw-border-hover",
+  border: "--tw-border", borderHover: "--tw-border-hover", selection: "--tw-selection",
   // colour — text tones
   title: "--tw-text-root", section: "--tw-text-section", text: "--tw-text-primary", label: "--tw-text-label",
   textMuted: "--tw-text-secondary", textFaint: "--tw-text-tertiary", focus: "--tw-text-focus",
