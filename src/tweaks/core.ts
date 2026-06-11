@@ -684,9 +684,11 @@ function showHint(anchor, text, themeVars) {
   clearTimeout(hintTimer);
   hintTip.textContent = text;
   applyThemeVars(hintTip, themeVars);
-  // Carry the nearest scheme scope, popover()-style — the tip portals to <body>, so a
+  // Carry the scheme scope, popover()-style — the tip portals to <body>, so a
   // [data-tw-scheme] scope that styles the panel can't reach it via the cascade.
-  const scheme = anchor.closest("[data-tw-scheme]")?.getAttribute("data-tw-scheme");
+  // Like popover(), copy the winning scheme, not the nearest (light pin outranks
+  // dark — see the scheme-resolution comment in tweaks.css).
+  const scheme = anchor.closest('[data-tw-scheme="light"]') ? "light" : anchor.closest('[data-tw-scheme="dark"]') ? "dark" : null;
   if (scheme) hintTip.setAttribute("data-tw-scheme", scheme); else hintTip.removeAttribute("data-tw-scheme");
   hintTip.style.visibility = "hidden"; hintTip.classList.add("is-open");
   const r = anchor.getBoundingClientRect(), w = hintTip.offsetWidth, h = hintTip.offsetHeight;
