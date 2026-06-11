@@ -28,6 +28,9 @@ panel.on((values) => { /* values.blur, values.tint, … */ });
 Add the styles with `tweakability/css`. Drag the panel by its header to reposition it
 (`{ draggable: false }` to opt out, `{ floating: true }` to start it floated).
 
+The default look follows the visitor's OS scheme; `data-tw-scheme="dark"` / `"light"`
+on any ancestor pins it (full story on the docs site's theming page).
+
 `tweaks()` returns synchronously — the panel and its API are ready at once; on the
 code-split build, heavy controls fill in behind `panel.ready`. `enhance(root)` upgrades
 `[data-tw]` markup in place.

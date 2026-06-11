@@ -42,9 +42,29 @@ await esbuild.build({
   legalComments: "none", define: { TW_SPLIT: "false" },
 });
 
-// 3) minified panel CSS → dist/tweaks.css
+// 3) minified panel CSS → dist/tweaks.css — after the light-twin check. The light
+// palette exists twice in tweaks.css (media-driven and attribute-forced — CSS can't
+// share one block across a media query and a selector); the copies must stay
+// declaration-identical, so diff them (comments/whitespace aside) and fail the build
+// the moment they drift.
 {
-  const { code } = await esbuild.transform(await readFile(p("src/tweaks.css"), "utf8"), { minify: true, loader: "css" });
+  const css = await readFile(p("src/tweaks.css"), "utf8");
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const mediaDriven = [], forced = [];
+  for (const m of bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim();
+    if (!sel.includes("data-tw-scheme") || !sel.includes(":where(")) continue;
+    const rule = (sel.slice(0, sel.indexOf(":where(")) + " { " + m[2] + " }").replace(/\s+/g, " ").trim();
+    (sel.includes('[data-tw-scheme="light"]') ? forced : mediaDriven).push(rule);
+  }
+  const at = mediaDriven.length !== forced.length ? Math.min(mediaDriven.length, forced.length)
+    : mediaDriven.findIndex((r, i) => r !== forced[i]);
+  if (!mediaDriven.length || mediaDriven.length !== forced.length || at !== -1) {
+    console.error(`✗ src/tweaks.css: the light-theme twins have drifted (rule ${at + 1}).`);
+    console.error("  media-driven: " + (mediaDriven[at] || "(missing)") + "\n  forced:       " + (forced[at] || "(missing)"));
+    process.exit(1);
+  }
+  const { code } = await esbuild.transform(css, { minify: true, loader: "css" });
   await writeFile(p("dist/tweaks.css"), code);
 }
 

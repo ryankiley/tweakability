@@ -96,6 +96,12 @@
 .tw-color-pop ::selection, .tw-select-dropdown ::selection, .tw-presets-menu ::selection { background: var(--tw-selection); color: var(--tw-text-focus); }
 .tw-panel, .tw-color-pop, .tw-select-dropdown, .tw-presets-menu { -webkit-tap-highlight-color: transparent; }
 
+/* UA-rendered internals (the colour pop's overflow scrollbar, text-input carets) follow
+ * the kit's resolved palette, not the host page's color-scheme — a dark panel on an
+ * undeclared light page still gets dark scrollbars. The light blocks at the foot of
+ * the file flip this to light together with the tokens. */
+.tw-panel, .tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip { color-scheme: dark; }
+
 /* Floating mode — a fixed, draggable panel. The header is the drag surface; a
  * grab cursor + a lift in elevation on pickup signal it. Below the portaled
  * popovers (z 50) so a control's dropdown still renders over the panel body.
@@ -827,8 +833,9 @@
  * every rule at base class specificity, so theme()/setTheme() overrides behave
  * exactly as before. The light token block appears TWICE — once media-driven, once
  * attribute-forced; CSS can't share one block across a media query and a selector.
- * KEEP THE TWO COPIES IN SYNC. Nesting schemes (a light scope inside a dark scope)
- * is not supported: any dark-pinned ancestor wins. */
+ * The two copies must stay declaration-identical — build.mjs diffs them and fails the
+ * build on drift. Nesting schemes (a light scope inside a dark scope) is not
+ * supported: any dark-pinned ancestor wins. */
 @media (prefers-color-scheme: light) {
   .tw-panel:where(:not([data-tw-scheme="dark"]):not([data-tw-scheme="dark"] *)) {
     /* Mirrors dark mode's tonal logic: an off-white base with item containers a step
@@ -858,23 +865,27 @@
     --tw-shadow-panel: 0 0 0 1px var(--tw-border), 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 18px 44px -12px rgba(0, 0, 0, 0.16);
     --tw-shadow-panel-lifted: 0 0 0 1px var(--tw-border-hover), 0 6px 16px -3px rgba(0, 0, 0, 0.12), 0 30px 70px -16px rgba(0, 0, 0, 0.2);
     --tw-success: #15803d;
+    color-scheme: light; /* UA internals (scrollbars, carets) flip with the palette */
   }
   /* Light mode: thumb/handle need definition — a subtle thumb shadow */
   .tw-slider-handle:where(:not([data-tw-scheme="dark"] *)) { box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
   /* Portaled popovers carry their own tokens — flip them to light too. (The scheme
-   * attribute, when present, sits on the portal root itself — copied at open.) */
-  :is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu):where(:not([data-tw-scheme="dark"])) {
+   * attribute, when present, sits on the portal root itself — copied at open; the
+   * hint tooltip gets the same carry, else it would keep its dark fallbacks.) */
+  :is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip):where(:not([data-tw-scheme="dark"])) {
     --tw-surface: rgba(255, 255, 255, 0.82); --tw-surface-hover: rgba(0, 0, 0, 0.04);
     --tw-surface-active: rgba(0, 0, 0, 0.1);
     --tw-text-label: rgba(0, 0, 0, 0.58); --tw-text-primary: rgba(0, 0, 0, 0.88);
     --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.34);
     --tw-border: rgba(0, 0, 0, 0.045); --tw-border-hover: rgba(0, 0, 0, 0.1); --tw-selection: rgba(0, 0, 0, 0.14);
     --tw-dropdown-bg: #f6f6f6; --tw-base: #f3f3f3; --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.14);
+    color-scheme: light;
   }
 }
 /* Attribute-forced light — the same block again, active in any OS scheme. Source
  * order matters: this sits after the dark defaults, so at equal specificity the
- * forced values win. KEEP IN SYNC with the media block above. */
+ * forced values win. Declaration-identical to the media block above (build.mjs
+ * enforces it). */
 .tw-panel:where([data-tw-scheme="light"], [data-tw-scheme="light"] *) {
   --tw-surface: rgba(255, 255, 255, 0.82);
   --tw-surface-hover: rgba(0, 0, 0, 0.04);
@@ -896,15 +907,17 @@
   --tw-shadow-panel: 0 0 0 1px var(--tw-border), 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 18px 44px -12px rgba(0, 0, 0, 0.16);
   --tw-shadow-panel-lifted: 0 0 0 1px var(--tw-border-hover), 0 6px 16px -3px rgba(0, 0, 0, 0.12), 0 30px 70px -16px rgba(0, 0, 0, 0.2);
   --tw-success: #15803d;
+  color-scheme: light; /* UA internals (scrollbars, carets) flip with the palette */
 }
 .tw-slider-handle:where([data-tw-scheme="light"] *) { box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
-:is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu):where([data-tw-scheme="light"]) {
+:is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu, .tw-tip):where([data-tw-scheme="light"]) {
   --tw-surface: rgba(255, 255, 255, 0.82); --tw-surface-hover: rgba(0, 0, 0, 0.04);
   --tw-surface-active: rgba(0, 0, 0, 0.1);
   --tw-text-label: rgba(0, 0, 0, 0.58); --tw-text-primary: rgba(0, 0, 0, 0.88);
   --tw-text-focus: #000000; --tw-text-tertiary: rgba(0, 0, 0, 0.34);
   --tw-border: rgba(0, 0, 0, 0.045); --tw-border-hover: rgba(0, 0, 0, 0.1); --tw-selection: rgba(0, 0, 0, 0.14);
   --tw-dropdown-bg: #f6f6f6; --tw-base: #f3f3f3; --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.14);
+  color-scheme: light;
 }
 
 /* Value readouts — the proportional UI font (same as the labels) plus tabular
