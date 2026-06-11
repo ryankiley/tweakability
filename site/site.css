@@ -78,11 +78,9 @@ a { color: var(--site-accent); text-decoration: none; }
 }
 .sb-brand { margin: 2px 10px 22px; }
 .sb-brand a {
-  display: inline-flex; align-items: center; gap: 9px;
   color: var(--site-text); font-size: 17px; font-weight: 600; letter-spacing: -0.02em;
 }
 .sb-brand a:hover { text-decoration: none; }
-.brand-mark { flex: none; }
 .sb-group { margin-bottom: 20px; }
 .sb-section {
   margin: 0 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
@@ -291,10 +289,7 @@ a { color: var(--site-accent); text-decoration: none; }
     color: var(--site-text); background: none; border: 1px solid var(--site-border);
     border-radius: 8px; cursor: pointer;
   }
-  .topbar-brand {
-    display: inline-flex; align-items: center; gap: 8px;
-    color: var(--site-text); font-weight: 600; letter-spacing: -0.02em; font-size: 16px;
-  }
+  .topbar-brand { color: var(--site-text); font-weight: 600; letter-spacing: -0.02em; font-size: 16px; }
 
   .layout { display: block; }
   .sb {
