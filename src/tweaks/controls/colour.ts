@@ -26,33 +26,57 @@ const wrapCss = (t, mode) =>
 // gradient control's trigger preview.
 const CHECKER = "repeating-conic-gradient(#6b6b6b 0% 25%, #9a9a9a 0% 50%) 0 0 / 8px 8px";
 
-// Parse any CSS colour (hex / oklch / rgb / hsl / named / oklab / lab / lch / color()) → [L, C, H, alpha].
+// Parse any CSS colour (hex / oklch / oklab / lab / lch / color() / rgb / hsl / named) → [L, C, H, alpha].
+// The CSS Color 4 functions are parsed by regex + the engine — channel handling ported
+// from the wide-gamut plugin's parser (tweakpane-plugin-wide-gamut core/parse.ts):
+// signs, exponents, `none` (→ 0), real angle units (deg/grad/rad/turn), and per-slot
+// `%` scaling (oklch/oklab C·a·b 100% ↔ 0.4, lab a/b ↔ ±125, lch C ↔ 150). The canvas
+// fallback below is only safe for sRGB-family colours: its fillStyle getter echoes wide
+// colours back in their own notation, and an rgb-shaped parse of that echo mangled them
+// (the "3" in "display-p3" read as a channel + alpha 0; lab() channels read as 0–255;
+// a `deg` unit or negative hue fell off the old regex onto the same path).
+const COLOR_FN_SPACES = { srgb: "srgb", "display-p3": "p3", rec2020: "rec2020", "prophoto-rgb": "prophoto-rgb" };
+const parseAngle = (t) => { const m = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(deg|grad|rad|turn)$/i.exec(t); if (!m) return num(parseFloat(t)); const n = parseFloat(m[1]); return m[2].toLowerCase() === "turn" ? n * 360 : m[2].toLowerCase() === "grad" ? n * 0.9 : m[2].toLowerCase() === "rad" ? (n * 180) / Math.PI : n; };
 function parseColor(str) {
   str = String(str == null ? "" : str).trim();
-  const m = str.match(/oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+)(%?))?\s*\)/i);
-  if (m) { let L = parseFloat(m[1]); if (m[2]) L /= 100; let A = m[5] != null ? parseFloat(m[5]) : 1; if (m[6]) A /= 100; return [num(L), num(parseFloat(m[3])), num(parseFloat(m[4])), clamp(num(A), 0, 1)]; } // num() keeps a degenerate-but-matching string (e.g. "oklch(. . .)") from leaking NaN downstream
-  // oklab → oklch is just the polar form (C = hypot(a,b), H = atan2(b,a)); do it directly,
-  // because the canvas fallback below can't be relied on to parse CSS Color 4 spaces in
-  // every browser — an unsupported oklab() silently falls back to black there.
-  const ml = str.match(/oklab\(\s*([\d.]+)(%?)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*(?:\/\s*([\d.]+)(%?))?\s*\)/i);
-  if (ml) { let L = parseFloat(ml[1]); if (ml[2]) L /= 100; const a = num(parseFloat(ml[3])), b = num(parseFloat(ml[4])); let A = ml[5] != null ? parseFloat(ml[5]) : 1; if (ml[6]) A /= 100; return [num(L), Math.hypot(a, b), (Math.atan2(b, a) * 180 / Math.PI + 360) % 360, clamp(num(A), 0, 1)]; }
   if (/^#?[0-9a-f]{3,8}$/i.test(str)) {
     let hx = str.replace("#", ""), A = 1;
     if (hx.length === 4) { A = parseInt(hx[3] + hx[3], 16) / 255; hx = hx.slice(0, 3); }
     else if (hx.length === 8) { A = parseInt(hx.slice(6, 8), 16) / 255; hx = hx.slice(0, 6); }
     const [L, C, H] = hexToOklch("#" + hx); return [L, C, H, A];
   }
-  // Anything else (rgb / hsl / named): normalise via a canvas — its fillStyle getter
-  // returns "#rrggbb" (opaque) or "rgba(r,g,b,a)" for sRGB-family colours, then parse
-  // that. (oklch/oklab are handled above by regex precisely because a canvas/computed
-  // probe can't be trusted to round-trip CSS Color 4 spaces in every browser.)
+  const m = str.match(/^(oklch|oklab|lch|lab|color)\(\s*([^)]*?)\s*\)$/i);
+  if (m) {
+    const fn = m[1].toLowerCase();
+    const [body, aRaw] = m[2].split("/").map((s) => s.trim());
+    let toks = body.split(/\s+/).filter(Boolean), space = fn;
+    if (fn === "color") { space = COLOR_FN_SPACES[(toks[0] || "").toLowerCase()]; toks = toks.slice(1); if (!space) return [0.7, 0.1, 280, 1]; } // an unsupported color() space (xyz, a98-rgb, …) degrades to the neutral default, never to mangled channels
+    // One channel: `none` → 0, `%` scales by the slot's own ratio, num() keeps a
+    // degenerate-but-matching token from leaking NaN downstream (the kit's idiom —
+    // a picker seed degrades, it doesn't reject).
+    const ch = (t, pctScale = 1) => (!t || t === "none" ? 0 : num(parseFloat(t)) * (/%$/.test(t) ? pctScale : 1));
+    const A = aRaw ? clamp(ch(aRaw, 0.01), 0, 1) : 1;
+    const c =
+      fn === "lab" ? [ch(toks[0]), ch(toks[1], 1.25), ch(toks[2], 1.25)]                       // L% is 0–100 as-is; a/b 100% ↔ ±125
+      : fn === "lch" ? [ch(toks[0]), ch(toks[1], 1.5), parseAngle(toks[2] || "0")]             // C 100% ↔ 150; H takes angle units
+      : fn === "color" ? [ch(toks[0], 0.01), ch(toks[1], 0.01), ch(toks[2], 0.01)]
+      : fn === "oklab" ? [ch(toks[0], 0.01), ch(toks[1], 0.004), ch(toks[2], 0.004)]           // L% → 0–1; a/b 100% ↔ ±0.4
+      : [ch(toks[0], 0.01), ch(toks[1], 0.004), parseAngle(toks[2] || "0")];                   // oklch
+    const k = space === "oklch" ? c : convert(c, space, "oklch");
+    return [num(k[0]), num(k[1]), ((num(k[2]) % 360) + 360) % 360, A]; // hue normalised to [0,360) so a negative input can't strand the strip thumb
+  }
+  // sRGB-family (rgb / hsl / hwb / named / transparent): normalise via a canvas — its
+  // fillStyle getter returns "#rrggbb" (opaque) or "rgba(r,g,b,a)" for these, then parse
+  // that. Wide colours never reach here (handled above); an unrecognised echo or plain
+  // junk parses as black, matching the old "junk leaves fillStyle at #000" behaviour.
   const c2d = ((parseColor as any)._c2d ||= document.createElement("canvas").getContext("2d"));
   c2d.fillStyle = "#000"; c2d.fillStyle = str;
   const norm = c2d.fillStyle;
   if (norm[0] === "#") return parseColor(norm); // opaque → the hex branch above
-  const cm = (norm.match(/[\d.]+/g) || [0, 0, 0]).map(Number);
+  const rm = norm.match(/^rgba?\(([^)]*)\)/i);
+  const cm = ((rm ? rm[1] : "").match(/-?[\d.]+(?:e[+-]?\d+)?/gi) || [0, 0, 0]).map(Number);
   const k = convert([cm[0] / 255, cm[1] / 255, cm[2] / 255], "srgb", "oklch");
-  return [num(k[0]), num(k[1]), num(k[2]), cm[3] != null ? cm[3] : 1];
+  return [num(k[0]), num(k[1]), num(k[2]), cm[3] != null ? clamp(num(cm[3]), 0, 1) : 1];
 }
 
 // ── Picker body — the editor surface itself: the L×C plane, the hue + alpha strips,

@@ -1,12 +1,21 @@
 // ── Interval / range slider — dual-handle [lo,hi]. Lazy.
-import { el, clamp, roundToStep, stepPrecision, wireHoverClass, onReady, registerControl } from "../shared.js";
+import { el, clamp, roundToStep, stepPrecision, inferStep, wireHoverClass, onReady, registerControl } from "../shared.js";
 
 // ── Interval / range slider — a dual-handle slider bound to [lo, hi] inside
 // [min, max] (Tweakpane-essentials' Interval; leva's `interval`). Reuses the
 // slider's track + fill + handle, so the range segment picks up the accent on
 // drag just like the single slider. Both handles are focusable role="slider"s. ──
 function createInterval(meta, onChange) {
-  const { label, min, max, step } = meta;
+  const label = meta.label;
+  // Normalise the range first (the slider's guard, mirrored): non-finite bounds fall
+  // back to the value tuple then 0/1, an inverted pair swaps, and a degenerate step
+  // re-infers — so markup like data-min="abc" can't ride in as NaN ("NaN – NaN").
+  let min = +meta.min, max = +meta.max, step = +meta.step;
+  const t0 = +(meta.value && meta.value[0]), t1 = +(meta.value && meta.value[1]);
+  if (!Number.isFinite(min)) min = Number.isFinite(t0) ? t0 : 0;
+  if (!Number.isFinite(max)) max = Number.isFinite(t1) ? t1 : 1;
+  if (max < min) { const t = min; min = max; max = t; }
+  if (!(step > 0) || step > max - min) step = inferStep(min, max);
   const decimals = stepPrecision(step);
   const q = (v) => roundToStep(v, min, step);
   // Missing/non-finite tuple entries fall back to the bounds (the .set path already

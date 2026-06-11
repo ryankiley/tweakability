@@ -7,15 +7,19 @@ import { el, svgEl, clamp, onReady, registerControl } from "../shared.js";
 // are arithmetic and a fixed whitelist of Math calls on a single number. There
 // is no property access, no identifier outside the whitelist, no way to reach a
 // global — so a user-typed formula is harmless. Returns null on any parse error.
-const PLOT_FUNCS = {
+// Both lookup tables are null-prototype: the parser checks `PLOT_FUNCS[name]` and
+// `name in PLOT_CONSTS`, and a plain object's prototype chain let "constructor" /
+// "toString" parse as valid identifiers (no escape — but they violated the whitelist
+// and "compiled" to garbage that silently plotted nothing).
+const PLOT_FUNCS = Object.assign(Object.create(null), {
   sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos,
   atan: Math.atan, atan2: Math.atan2, sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
   sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs, exp: Math.exp, log: Math.log, ln: Math.log,
   log10: Math.log10, log2: Math.log2, floor: Math.floor, ceil: Math.ceil, round: Math.round,
   sign: Math.sign, trunc: Math.trunc, min: Math.min, max: Math.max, pow: Math.pow, hypot: Math.hypot,
   mod: (a, b) => a % b, clamp: (v, lo, hi) => Math.min(Math.max(v, lo), hi),
-};
-const PLOT_CONSTS = { pi: Math.PI, e: Math.E, tau: Math.PI * 2, phi: (1 + Math.sqrt(5)) / 2 };
+});
+const PLOT_CONSTS = Object.assign(Object.create(null), { pi: Math.PI, e: Math.E, tau: Math.PI * 2, phi: (1 + Math.sqrt(5)) / 2 });
 export function compileExpr(src) {
   if (typeof src !== "string" || !src.trim() || src.length > 512) return null; // the length cap also bounds recursion depth, so an absurdly nested formula can't overflow the stack mid-parse (a RangeError past the "null on parse error" contract — and the init call in createPlot is unguarded)
   const s = src, toks = [];
@@ -98,9 +102,17 @@ export function compileExpr(src) {
 // for a fixed JS function instead of an editable string. Y auto-ranges unless
 // yMin/yMax are given; the line breaks across asymptotes (non-finite samples). ──
 function createPlot(meta, onChange) {
-  const xMin = Number(meta.xMin), xMax = Number(meta.xMax);
-  const samples = Math.max(2, (meta.samples | 0) || 256);
-  const fixedY = Number.isFinite(meta.yMin) && Number.isFinite(meta.yMax);
+  // Domain guard: non-finite bounds take the defaults, an inverted pair swaps, and an
+  // equal pair pads out — xMin === xMax used to divide the x-mapping into an all-NaN
+  // path (a silently blank plot). Same for a pinned y-range: equal/inverted falls back
+  // to auto-range rather than a ÷0.
+  let xMin = Number(meta.xMin), xMax = Number(meta.xMax);
+  if (!Number.isFinite(xMin)) xMin = -10;
+  if (!Number.isFinite(xMax)) xMax = 10;
+  if (xMax < xMin) { const t = xMin; xMin = xMax; xMax = t; }
+  if (xMax === xMin) { xMin -= 1; xMax += 1; }
+  const samples = Math.max(2, Math.min(4096, (meta.samples | 0) || 256)); // capped: the curve redraws on every resize + expression keystroke, so an absurd sample count (1e8+) froze the tab
+  const fixedY = Number.isFinite(meta.yMin) && Number.isFinite(meta.yMax) && +meta.yMax > +meta.yMin;
   const editable = meta.editable !== false && !meta.fn;
   let expr = meta.expr != null ? String(meta.expr) : "";
   let compiled = typeof meta.fn === "function" ? meta.fn : compileExpr(expr);
