@@ -640,7 +640,23 @@ const ICON_INFO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const makeCopyBtn = () => { const b = el("button", "tw-toolbar-btn tw-toolbar-btn--swap", `<span class="tw-toolbar-btn__icons">${ICON_COPY}${ICON_CHECK}</span>`); b.type = "button"; b.title = "Copy values"; b.setAttribute("aria-label", "Copy values"); return b; };
 const makeResetBtn = () => { const b = el("button", "tw-toolbar-btn tw-toolbar-btn--reset", ICON_RESET); b.type = "button"; b.title = "Reset"; b.setAttribute("aria-label", "Reset"); return b; };
 const flashCopied = (btn) => { btn.classList.add("is-copied"); clearTimeout(btn._t); btn._t = setTimeout(() => btn.classList.remove("is-copied"), 1400); };
-const spinReset = (btn) => { btn.classList.remove("is-spinning"); void btn.offsetWidth; btn.classList.add("is-spinning"); clearTimeout(btn._t); btn._t = setTimeout(() => btn.classList.remove("is-spinning"), 500); };
+// Reset spin — an accumulated rotation on --tw-spin, driven by the transform transition
+// (no keyframes): transitions retarget mid-flight, so a second click mid-spin continues
+// smoothly into the next full turn from the current angle instead of snapping back to
+// rest ("interruptible beats staged"). is-spinning lengthens the transition for the
+// spin's run; once settled, the counter renormalises to 0 with the transition suppressed
+// — −n·360° is the same angle, so nothing visibly moves and the counter can't grow forever.
+const spinReset = (btn) => {
+  const svg = btn.querySelector("svg");
+  svg.style.setProperty("--tw-spin", `${(parseFloat(svg.style.getPropertyValue("--tw-spin")) || 0) - 360}deg`);
+  btn.classList.add("is-spinning");
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => {
+    btn.classList.remove("is-spinning");
+    svg.style.transition = "none"; svg.style.setProperty("--tw-spin", "0deg");
+    void svg.offsetWidth; svg.style.transition = "";
+  }, 520);
+};
 
 function showToast(msg) {
   const toast = document.querySelector(".toast");
@@ -956,7 +972,14 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       if (e.button !== 0 || e.target.closest(".tw-toolbar, input, textarea, select")) return;
       dragId = e.pointerId; sx = e.clientX; sy = e.clientY; dragMoved = false;
       panel.classList.add("is-grabbing"); // press feedback: brighten the grabber the instant it's grabbed, before any move — matters on touch, where there's no hover to reveal it first
-      panel.style.transition = ""; // clear any leftover snap transition so the grab is 1:1
+      // Regrab mid–edge-snap: pick the panel up where it visually is (the eased,
+      // in-flight position), not the parked target px/py already hold — clearing the
+      // transition against the target style teleported it on the first move.
+      if (panel.style.transition) {
+        const cur = getComputedStyle(panel);
+        px = parseFloat(cur.left) || px; py = parseFloat(cur.top) || py;
+        panel.style.transition = ""; apply();
+      } else panel.style.transition = ""; // clear any leftover snap transition so the grab is 1:1
     });
     header.addEventListener("pointermove", (e) => {
       if (e.pointerId !== dragId) return;
