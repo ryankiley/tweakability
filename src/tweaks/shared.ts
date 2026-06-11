@@ -40,7 +40,7 @@ const defaultRange = (v) => (v >= 0 ? [0, v <= 1 ? 1 : v * 3 || 100] : [v >= -1 
 // value, labelled by its string form. (Primitives used to fall into the object arm
 // and read `.value` off a number — empty labels, undefined values.)
 const optValue = (o) => (o == null ? undefined : typeof o === "object" ? o.value : o);
-const optLabel = (o) => (o == null ? "" : typeof o === "string" ? titleCase(o) : typeof o === "object" ? o.label : String(o));
+const optLabel = (o) => (o == null ? "" : typeof o === "string" ? titleCase(o) : typeof o === "object" ? o.label ?? String(o.value) : String(o)); // label is optional on { value } options — fall back to the value's string form, not the literal "undefined"
 
 const svgNS = "http://www.w3.org/2000/svg";
 // el/svgEl return `any` on purpose: they're the internal DOM factory, used as div /
@@ -70,11 +70,12 @@ const wireHoverClass = (el, onEnter) => {
 // point pad, and the bezier handles — the controls with bespoke physics (slider,
 // number scrub, gradient) keep their own loops.
 function dragGesture(node: any, { onDown, onMove, onEnd }: { onDown?: (e: any) => void; onMove?: (e: any) => void; onEnd?: (e: any) => void } = {}) {
-  let active = false;
-  const end = (e) => { if (!active) return; active = false; onEnd && onEnd(e); };
-  node.addEventListener("pointerdown", (e) => { active = true; try { node.setPointerCapture(e.pointerId); } catch {} onDown && onDown(e); });
-  node.addEventListener("pointermove", (e) => { if (!active) return; if (e.buttons === 0) return end(e); onMove && onMove(e); });
+  let activeId = null; // the one captured pointer — a second finger / other-button press can't hijack or fork the drag
+  const end = (e) => { if (activeId === null || e.pointerId !== activeId) return; activeId = null; onEnd && onEnd(e); };
+  node.addEventListener("pointerdown", (e) => { if (e.button !== 0 || activeId !== null) return; activeId = e.pointerId; try { node.setPointerCapture(e.pointerId); } catch {} onDown && onDown(e); });
+  node.addEventListener("pointermove", (e) => { if (e.pointerId !== activeId) return; if (e.buttons === 0) return end(e); onMove && onMove(e); });
   node.addEventListener("pointerup", end); node.addEventListener("pointercancel", end);
+  node.addEventListener("lostpointercapture", end); // implicit capture loss (the popover unmounting mid-drag) ends the gesture too, so grab state can't strand
 }
 // Pointer position inside a box as [x, y] fractions in 0–1 — read off the box's own
 // rect (the colour plane/strips and the point pad).
@@ -112,16 +113,16 @@ const placeBelow = (trigger: any, pop: any, { width, fallbackH = 300, gap = 6, a
 const THEME_ALIASES = {
   // colour — backdrops
   accent: "--tw-accent", base: "--tw-base", dropdownBg: "--tw-dropdown-bg",
-  surface: "--tw-surface", surfaceHover: "--tw-surface-hover", surfaceActive: "--tw-surface-active", surfaceSubtle: "--tw-surface-subtle",
+  surface: "--tw-surface", surfaceHover: "--tw-surface-hover", surfaceActive: "--tw-surface-active",
   border: "--tw-border", borderHover: "--tw-border-hover", selection: "--tw-selection",
   // colour — text tones
   title: "--tw-text-root", section: "--tw-text-section", text: "--tw-text-primary", label: "--tw-text-label",
   textMuted: "--tw-text-secondary", textFaint: "--tw-text-tertiary", focus: "--tw-text-focus",
-  success: "--tw-success",
+  success: "--tw-success", danger: "--tw-danger",
   // elevation
   shadow: "--tw-shadow-dropdown", shadowPanel: "--tw-shadow-panel", shadowPanelLifted: "--tw-shadow-panel-lifted",
   // type + shape
-  font: "--tw-font-sans", radius: "--tw-radius", density: "--tw-row-height", // numeric → px
+  font: "--tw-font-sans", fontMono: "--tw-font-mono", radius: "--tw-radius", density: "--tw-row-height", // numeric → px
 };
 const TW_PX_ALIASES = new Set(["radius", "density"]);
 const resolveTheme = (theme) => {
@@ -134,7 +135,14 @@ const resolveTheme = (theme) => {
   }
   return Object.keys(out).length ? out : null;
 };
-const applyThemeVars = (node, vars) => { if (node && vars) for (const k in vars) node.style.setProperty(k, vars[k]); };
+// Reused portaled nodes (popover, hint tip, toast) re-theme on every show — clear the
+// previous application first, so a null/partial theme actually reverts what it no longer names.
+const applyThemeVars = (node, vars) => {
+  if (!node) return;
+  if (node._twAppliedVars) for (const k of node._twAppliedVars) node.style.removeProperty(k);
+  node._twAppliedVars = vars ? Object.keys(vars) : null;
+  if (vars) for (const k in vars) node.style.setProperty(k, vars[k]);
+};
 
 // ── Popover — the one portal-to-<body> shell behind every transient surface: the
 // colour picker, the gradient editor, the select dropdown, and the presets menu.
@@ -144,8 +152,14 @@ const applyThemeVars = (node, vars) => { if (node && vars) for (const k in vars)
 // other one is up. onOpen runs once it's placed at real size (then it re-places,
 // so content rendered in onOpen is measured); onReflow on scroll/resize while open.
 let activePopoverClose: null | (() => void) = null;
+const closeActivePopover = () => { if (activePopoverClose) activePopoverClose(); }; // panel teardown closes whichever popover is up
 function popover(root: any, trigger: any, pop: any, opts: { width?: number | "match"; fallbackH?: number; gap?: number; align?: "start" | "end"; onOpen?: () => void; onReflow?: () => void } = {}) {
   let open = false;
+  pop.classList.add("tw-portal"); // the reduced-motion kill-switch + portal-wide rules key off this
+  // Relay pointerdowns to the host panel's edit-lifecycle hook (capture, ahead of the
+  // pointer-stop below) — the colour/gradient drag surfaces live here on <body>, where
+  // the panel's own pointerdown listener can't see them.
+  pop.addEventListener("pointerdown", (e) => trigger.closest(".tw-panel")?._twEditPointer?.(e), true);
   stopPointerLeak(pop); // on <body>, outside the panel's own pointer-stop
   const place = () => placeBelow(trigger, pop, { width: opts.width, fallbackH: opts.fallbackH, gap: opts.gap, align: opts.align });
   // A reflow against a detached trigger would place off its zero-rect (the pop jumps to
@@ -181,6 +195,9 @@ function popover(root: any, trigger: any, pop: any, opts: { width?: number | "ma
   };
   const close = () => {
     if (activePopoverClose === close) activePopoverClose = null;
+    // Focus stranded inside the pop (picking an option, loading a preset) returns to the
+    // trigger before the node is removed; an outside click that already moved focus keeps it.
+    if (pop.contains(document.activeElement)) trigger.focus();
     open = false; root.classList.remove("is-open"); pop.classList.remove("is-open"); trigger.setAttribute("aria-expanded", "false");
     document.removeEventListener("pointerdown", onOutside, true); document.removeEventListener("keydown", onKey);
     window.removeEventListener("scroll", reflow, true); window.removeEventListener("resize", reflow);
@@ -239,7 +256,7 @@ function makeGrabGuide() {
   let g = null;
   return {
     show(x, y, bubbleX) {
-      g = el("div", "tw-grab-guide");
+      g = el("div", "tw-grab-guide tw-portal");
       g.innerHTML = `<span class="tw-grab-line"></span><span class="tw-grab-dot"></span><span class="tw-grab-arrow"></span><span class="tw-grab-bubble"></span>`;
       g._y = y; g._x0 = x; g._bx = bubbleX ?? x; // bubble anchors over the field centre, not the cursor
       g.children[1].style.cssText = `left:${x}px;top:${y}px`;
@@ -262,12 +279,13 @@ function makeGrabGuide() {
 // from the field. read() returns the live value, apply(v) commits it, text() the
 // bubble label. Shared by createNumber and the numField building block.
 function attachScrub(grab, wrap, step, read, apply, text) {
-  let downX = 0, downV = 0, dragging = false, curK = 1; const gd = makeGrabGuide();
-  grab.addEventListener("pointerdown", (e) => { e.preventDefault(); dragging = true; downX = e.clientX; downV = read(); curK = 1; grab.classList.add("is-dragging"); try { grab.setPointerCapture(e.pointerId); } catch {} const br = wrap.getBoundingClientRect(); gd.show(e.clientX, br.top + br.height / 2, br.left + br.width / 2); gd.move(e.clientX, text()); });
+  let downX = 0, downV = 0, activeId = null, curK = 1; const gd = makeGrabGuide();
+  grab.addEventListener("pointerdown", (e) => { if (e.button !== 0 || activeId !== null) return; e.preventDefault(); activeId = e.pointerId; downX = e.clientX; downV = read(); curK = 1; grab.classList.add("is-dragging"); try { grab.setPointerCapture(e.pointerId); } catch {} const br = wrap.getBoundingClientRect(); gd.show(e.clientX, br.top + br.height / 2, br.left + br.width / 2); gd.move(e.clientX, text()); });
   // Shift = coarse (×10), Alt = fine (×0.1); re-anchor on a modifier change so the value doesn't jump.
-  grab.addEventListener("pointermove", (e) => { if (!dragging) return; if (e.buttons === 0) { end(); return; } const k = e.shiftKey ? 10 : e.altKey ? 0.1 : 1; if (k !== curK) { curK = k; downX = e.clientX; downV = read(); } apply(downV + (e.clientX - downX) * step * k); gd.move(e.clientX, text()); });
-  const end = () => { dragging = false; grab.classList.remove("is-dragging"); gd.hide(); };
+  grab.addEventListener("pointermove", (e) => { if (e.pointerId !== activeId) return; if (e.buttons === 0) { end(e); return; } const k = e.shiftKey ? 10 : e.altKey ? 0.1 : 1; if (k !== curK) { curK = k; downX = e.clientX; downV = read(); } apply(downV + (e.clientX - downX) * step * k); gd.move(e.clientX, text()); });
+  const end = (e) => { if (activeId === null || e.pointerId !== activeId) return; activeId = null; grab.classList.remove("is-dragging"); gd.hide(); };
   grab.addEventListener("pointerup", end); grab.addEventListener("pointercancel", end);
+  grab.addEventListener("lostpointercapture", end); // capture lost mid-scrub (the popover hosting the field closing) must still hide the full-screen guide — the singleton ref is overwritten on the next show, which would orphan the node
 }
 
 // ── A labelled numeric field: an uppercase label over a boxed input with a
@@ -310,8 +328,8 @@ export const getControl = (type) => REGISTRY[type];
 export {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, svgEl, cssVar, accentColor, stopPointerLeak, onReady,
-  wireHoverClass, dragGesture, boxFrac, fitCanvas, popover,
+  wireHoverClass, dragGesture, boxFrac, fitCanvas, popover, closeActivePopover,
   resolveTheme, applyThemeVars, fuzzyMatch, setRadioActive, radioButton,
-  attachScrub, numField, stretchPill, ICON_GRIP,
+  attachScrub, numField, stretchPill, ICON_GRIP, REDUCE_MOTION,
 };
 

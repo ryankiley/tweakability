@@ -70,8 +70,8 @@ export interface Theme {
   base?: string;
   /** Popover / dropdown background. */
   dropdownBg?: string;
-  /** Control surface and its hover / active / subtle steps. */
-  surface?: string; surfaceHover?: string; surfaceActive?: string; surfaceSubtle?: string;
+  /** Control surface and its hover / active steps. */
+  surface?: string; surfaceHover?: string; surfaceActive?: string;
   /** Hairline border and its hover step. */
   border?: string; borderHover?: string;
   /** Text-selection highlight wash. */
@@ -80,10 +80,12 @@ export interface Theme {
   title?: string; section?: string; text?: string; label?: string; textMuted?: string; textFaint?: string; focus?: string;
   /** Copy-confirmation accent. */
   success?: string;
+  /** Invalid-state accent (the plot's bad-expression cue). */
+  danger?: string;
   /** Popover shadow, the panel's container elevation, and its lifted (floating / dragging) variant. */
   shadow?: string; shadowPanel?: string; shadowPanelLifted?: string;
-  /** Font stack. */
-  font?: string;
+  /** Font stack, and the monospace stack (the plot's expression field). */
+  font?: string; fontMono?: string;
   /** Control corner radius and row height — a bare number is treated as px. */
   radius?: number | string; density?: number | string;
   /** Escape hatch — any raw token, e.g. `"--tw-accent": "#6c8cff"`. */
@@ -128,7 +130,9 @@ export interface Panel {
   ready: Promise<Panel>;
   /** Subscribe to changes; returns an unsubscribe fn. */
   on(fn: (params: Params, last?: string) => void): () => void;
-  /** Set a control's value programmatically. */
+  /** Set a control's value programmatically. Nested controls take a dotted path
+   *  ("folder.child", "tabs.page.child"); a bare key also reaches a nested control
+   *  when it's unambiguous. A key matching no control is stored on `params` as-is. */
   set(key: string, value: unknown): void;
   /** Reset every control to its default (or run `opts.onReset`). */
   reset(): void;
@@ -145,6 +149,8 @@ export interface Panel {
   /** Undo / redo (need `opts.undo`). */
   undo(): void;
   redo(): void;
+  /** Tear the panel down — remove it from the DOM, release every global listener, close any open popover; the API goes inert. */
+  destroy(): void;
 }
 
 /** A built control's handle (internal-ish, but used across modules). */
