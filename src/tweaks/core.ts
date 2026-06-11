@@ -13,7 +13,7 @@
  */
 
 import {
-  titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultMax,
+  titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, popover, stopPointerLeak, applyThemeVars, resolveTheme, onReady,
   wireHoverClass, fuzzyMatch, setRadioActive, radioButton, attachScrub, stretchPill, ICON_GRIP,
   registerControl, getControl,
@@ -66,8 +66,8 @@ const ensureForMetas = (metas) => {
 // Parse one schema entry → a control meta. Returns null for unknown shapes.
 // Per-control options (render / disabled / hint) ride on any object-form value; the
 // wrapper attaches them to whatever control baseMetaFor infers.
-function metaFor(key, value) {
-  const meta = baseMetaFor(key, value);
+function metaFor(key, value, depth = 0) {
+  const meta = baseMetaFor(key, value, depth);
   if (meta && value && typeof value === "object") {
     if (typeof value.render === "function") meta.render = value.render;
     if (value.disabled != null) meta.disabled = value.disabled;
@@ -85,7 +85,7 @@ const isObj = (v) => v && typeof v === "object";
 // The explicit slider/number/checkbox forms exist so shorthand controls can carry
 // options (render / disabled / hint / step) the array/boolean shorthands can't.
 const radiogridMeta = (v, key, label) => Array.isArray(v.options) && { type: "radiogrid", key, label, options: v.options, value: v.value ?? optValue(v.options[0]), cols: v.cols };
-const TYPED_META: Record<string, (v: any, key: string, label: string) => any> = {
+const TYPED_META: Record<string, (v: any, key: string, label: string, depth?: number) => any> = {
   slider: (v, key, label) => { const mn = v.min ?? 0, mx = v.max ?? 1; return { type: "slider", key, label, value: v.value ?? mn, min: mn, max: mx, step: v.step ?? inferStep(mn, mx), soft: v.soft }; },
   number: (v, key, label) => ({ type: "number", key, label, value: v.value ?? 0, min: v.min, max: v.max, step: v.step ?? 1, soft: v.soft }),
   checkbox: (v, key, label) => ({ type: "checkbox", key, label, value: !!v.value }),
@@ -114,30 +114,45 @@ const TYPED_META: Record<string, (v: any, key: string, label: string) => any> = 
   monitor: (v, key, label) => ({ type: "monitor", key, label, get: v.get, value: v.value, graph: v.graph, view: v.view, min: v.min, max: v.max, interval: v.interval, rows: v.rows, decimals: v.decimals }),
   buttongroup: (v, key, label) => ({ type: "buttongroup", key, label, buttons: v.buttons }),
   separator: (v, key, label) => ({ type: "separator", key, label }),
-  tabs: (v, key, label) => v.pages && typeof v.pages === "object" && { type: "tabs", key, label, pages: Object.entries(v.pages).map(([title, schema]: [string, any]) => ({ key: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"), title, children: Object.entries(schema).map(([k, sv]) => metaFor(k, sv)).filter(Boolean) })) },
+  // Page keys dedupe ("A!" and "A?" both slug to "a") so two pages can't silently share
+  // one params subtree (the second used to overwrite the first, losing its values).
+  tabs: (v, key, label, depth) => {
+    if (!v.pages || typeof v.pages !== "object") return false;
+    const used = new Set();
+    return { type: "tabs", key, label, pages: Object.entries(v.pages).map(([title, schema]: [string, any]) => {
+      const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "tab";
+      let k = base, n = 2; while (used.has(k)) k = `${base}-${n++}`; used.add(k);
+      return { key: k, title, children: Object.entries(schema).map(([ck, sv]) => metaFor(ck, sv, (depth || 0) + 1)).filter(Boolean) };
+    }) };
+  },
 };
 
-function baseMetaFor(key, value) {
+function baseMetaFor(key, value, depth = 0) {
+  if (depth > 64) return null; // a pathologically deep schema degrades to skipped controls instead of a RangeError out of tweaks()
   const label = titleCase(key);
   if (isObj(value) && !Array.isArray(value) && Object.prototype.hasOwnProperty.call(TYPED_META, value.type)) { // hasOwnProperty, so a stray type like "toString" can't hit Object.prototype
-    const meta = TYPED_META[value.type](value, key, label);
+    const meta = TYPED_META[value.type](value, key, label, depth);
     if (meta) return meta;
   }
   // ── Shorthand inference ──
   // Interval / range: [[lo, hi], min, max, step?] — the first entry is a 2-tuple.
   if (Array.isArray(value) && Array.isArray(value[0]) && value[0].length === 2 && typeof value[0][0] === "number") {
-    return { type: "interval", key, label, value: value[0].map(Number), min: value[1], max: value[2], step: value[3] ?? inferStep(value[1], value[2]) };
+    // Missing bounds fall back to the tuple itself ([[2,8]] → min 2, max 8) — an
+    // undefined min/max used to ride into the control as NaN ("NaN – NaN").
+    const mn = Number.isFinite(+value[1]) ? +value[1] : +value[0][0], mx = Number.isFinite(+value[2]) ? +value[2] : +value[0][1];
+    return { type: "interval", key, label, value: value[0].map(Number), min: mn, max: mx, step: value[3] ?? inferStep(mn, mx) };
   }
   if (Array.isArray(value) && value.length <= 4 && typeof value[0] === "number") {
     // Tolerate a short array (e.g. [n] = "just a default"): fall back to a sensible
     // range the way a bare number does, so a missing min/max can't yield a NaN slider.
     const v0 = value[0];
-    const min = value.length > 1 ? value[1] : 0;
-    const max = value.length > 2 ? value[2] : defaultMax(v0);
+    const [dmin, dmax] = defaultRange(v0);
+    const min = value.length > 1 ? value[1] : dmin;
+    const max = value.length > 2 ? value[2] : dmax;
     return { type: "slider", key, label, value: v0, min, max, step: value[3] ?? inferStep(min, max) };
   }
   if (typeof value === "number") {
-    const min = 0, max = defaultMax(value);
+    const [min, max] = defaultRange(value);
     return { type: "slider", key, label, value, min, max, step: inferStep(min, max) };
   }
   if (typeof value === "boolean") return { type: "checkbox", key, label, value };
@@ -148,14 +163,23 @@ function baseMetaFor(key, value) {
     return { type: "list", key, label, options: value.options, value: value.value ?? optValue(value.options[0]) };
   if (isColorStr(value)) return { type: "color", key, label, value };
   if (typeof value === "string") return { type: "text", key, label, value };
-  if (isObj(value)) return { type: "folder", key, label, children: Object.entries(value).map(([k, v]) => metaFor(k, v)).filter(Boolean) };
+  if (isObj(value)) return { type: "folder", key, label, children: Object.entries(value).map(([k, v]) => metaFor(k, v, depth + 1)).filter(Boolean) };
   return null;
 }
 
 // ── Slider control (ported from Slider.tsx) ──
 const CLICK_THRESHOLD = 3, DEAD_ZONE = 32, MAX_CURSOR_RANGE = 200, MAX_STRETCH = 8;
 function createSlider(meta, onChange) {
-  const { label, min, max, step } = meta;
+  const label = meta.label;
+  // Normalise the range before anything reads it: non-finite bounds get defaults, an
+  // inverted pair swaps (a backwards schema/markup used to clamp the value to the wrong
+  // end), and a degenerate step re-infers — every slider source (schema shorthand,
+  // verbose form, [data-tw] markup) funnels through here.
+  let min = +meta.min, max = +meta.max, step = +meta.step;
+  if (!Number.isFinite(min)) min = 0;
+  if (!Number.isFinite(max)) max = min + 100;
+  if (max < min) { const t = min; min = max; max = t; }
+  if (!(step > 0) || step > max - min) step = inferStep(min, max);
   let value = clamp(Number.isFinite(+meta.value) ? +meta.value : min, min, max), pull = 0; // non-finite seed → min, so a NaN value / garbage data-value can't reach the readout or param; pull = the discrete detent's tension offset (read by render(), called below at construction)
   const decimals = stepPrecision(step);
 
@@ -382,7 +406,7 @@ function createSegmented(options, value, onChange, ariaLabel) {
     else if (e.key === "Home") n = 0;
     else if (e.key === "End") n = btns.length - 1;
     else return;
-    e.preventDefault(); set(btns[n].dataset.value); btns[n].focus();
+    e.preventDefault(); set(btns[n]._twVal); btns[n].focus(); // _twVal, not dataset.value — the keyboard pick must emit the option's real (possibly non-string) value
   });
   reflect();
   requestAnimationFrame(() => { measure(); seg.classList.add("is-ready"); });
@@ -429,7 +453,7 @@ function createRadiogrid(meta, onChange) {
       case "End": j = n - 1; break;
       default: return;
     }
-    e.preventDefault(); if (j !== i) { set(btns[j].dataset.value); btns[j].focus(); }
+    e.preventDefault(); if (j !== i) { set(btns[j]._twVal); btns[j].focus(); } // _twVal, not dataset.value — same reason as the segmented control
   });
   reflect();
   row.append(label, grid);
@@ -456,7 +480,7 @@ function createSelect(meta, onChange) {
     dropdown.append(b); return b;
   });
   root.append(trigger, dropdown);
-  const reflect = () => { valEl.textContent = (opts.find((o) => o.value === value) || {}).label ?? value; optButtons.forEach((b) => { const sel = b.dataset.value === value; b.dataset.selected = String(sel); b.setAttribute("aria-selected", String(sel)); }); };
+  const reflect = () => { valEl.textContent = (opts.find((o) => o.value === value) || {}).label ?? value; optButtons.forEach((b) => { const sel = b.dataset.value === String(value); b.dataset.selected = String(sel); b.setAttribute("aria-selected", String(sel)); }); }; // String(value): dataset stringifies, so numeric option values never matched (no selected/aria state)
   const set = (v, fire = true) => { value = v; reflect(); if (fire) onChange(v); };
   // The shared popover shell portals the dropdown to <body> (never clipped by the
   // panel's overflow or a transformed ancestor), themes + places it, and closes on
@@ -465,7 +489,7 @@ function createSelect(meta, onChange) {
   // Only the roving-focus listbox keyboarding below is select-specific.
   const pop = popover(root, trigger, dropdown, {
     width: "match", fallbackH: 200, gap: 4,
-    onOpen: () => (optButtons.find((b) => b.dataset.value === value) || optButtons[0])?.focus(),
+    onOpen: () => (optButtons.find((b) => b.dataset.value === String(value)) || optButtons[0])?.focus(),
   });
   // Keyboard: open from the trigger with ↑/↓; once open, roving focus moves through
   // the options (Enter/Space on a focused option selects it natively via click),
@@ -534,7 +558,9 @@ function createString(meta, onChange) {
 
 // ── Number — a typeable field with a Tweakpane-style grab handle (drag to scrub) ──
 function createNumber(meta, onChange) {
-  const min = meta.min, max = meta.max, step = meta.step ?? 1;
+  let min = +meta.min, max = +meta.max; // non-finite (absent/garbage) → unbounded, matching fit()'s isFinite guards
+  if (Number.isFinite(min) && Number.isFinite(max) && max < min) { const t = min; min = max; max = t; }
+  const step = +meta.step > 0 ? +meta.step : 1; // a 0/negative/NaN step deadened the scrub + keyboard
   const fit = (v) => {
     let n = roundToStep(v, Number.isFinite(min) ? min : 0, step);
     if (!meta.soft) { if (Number.isFinite(min)) n = Math.max(min, n); if (Number.isFinite(max)) n = Math.min(max, n); }
@@ -668,9 +694,12 @@ registerControl("number", createNumber);
 registerControl("folder", createFolder);
 
 export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): Panel {
-  const metas = Object.entries(schema).map(([k, v]) => metaFor(k, v)).filter(Boolean);
+  // "_last" is the changed-key channel on params — a schema entry by that name would
+  // fight it (the param's value doubles as the listener's "what changed" argument).
+  const metas = Object.entries(schema).filter(([k]) => k !== "_last" || (console.warn('[tweaks] "_last" is reserved (the changed-key channel) — schema entry skipped'), false)).map(([k, v]) => metaFor(k, v)).filter(Boolean);
   const params: Params = {};
   const entries = []; // { target, key, set, get, def, path } — flattened across folders, for reset + persist
+  const subTrees = new Set(); // the folder/tabs params sub-objects — set() refuses to overwrite one (doing so orphaned every child entry silently)
   const listeners = new Set<(p?: any, last?: any) => void>();
   let persist = () => {}; // reassigned below when opts.persist is set (debounced localStorage save)
   // Assigned by assemble() below. Declared here so the API returned synchronously can
@@ -782,16 +811,16 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const build = (container, ms, target, basePath = [], folderItem = null) => {
     for (const m of ms) {
       if (m.type === "tabs") {
-        const sub = {}; target[m.key] = sub;
+        const sub = {}; subTrees.add(sub); target[m.key] = sub;
         const makeTabs = getControl("tabs");
         const tabsCtrl = makeTabs && makeTabs(m);
         if (!tabsCtrl) continue; // tabs module ensured before assemble; skip if it failed to load
-        m.pages.forEach((page, i) => { const psub = {}; sub[page.key] = psub; build(tabsCtrl.bodies[i], page.children, psub, [...basePath, m.key, page.key]); });
+        m.pages.forEach((page, i) => { const psub = {}; subTrees.add(psub); sub[page.key] = psub; build(tabsCtrl.bodies[i], page.children, psub, [...basePath, m.key, page.key]); });
         registerCond(tabsCtrl.el, m); container.append(tabsCtrl.el);
         continue;
       }
       if (m.type === "folder") {
-        const sub = {}; target[m.key] = sub;
+        const sub = {}; subTrees.add(sub); target[m.key] = sub;
         const f = createFolder(m);
         const fi = filterOn ? { el: f.el, label: m.label, body: f.body } : null;
         if (fi) filterFolders.push(fi);
@@ -801,6 +830,10 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       if (VALUELESS.has(m.type)) { const ctrl = createControl(m, () => {}); if (ctrl) { if (filterOn && m.type !== "separator") filterItems.push({ el: ctrl.el, label: m.label, folder: folderItem }); registerCond(ctrl.el, m); container.append(ctrl.el); } continue; }
       const ctrl = createControl(m, (v) => { target[m.key] = v; params._last = m.key; notify(); });
       if (!ctrl) continue;
+      // A value set() through the API before assemble ran (the lazy-load window on the
+      // split build) wins over the schema default — apply it to the control rather than
+      // clobbering it back with ctrl.get().
+      if (Object.prototype.hasOwnProperty.call(target, m.key)) ctrl.set(target[m.key]);
       target[m.key] = ctrl.get();
       const entry = { target, key: m.key, set: ctrl.set, get: ctrl.get, def: m.value, path: [...basePath, m.key] };
       entries.push(entry); wireReset(ctrl.el, entry); registerCond(ctrl.el, m);
@@ -870,7 +903,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
     let saveT; persist = () => { clearTimeout(saveT); saveT = setTimeout(() => writeStore(persistKey, snapshot()), 150); };
     applySnapshot(readStore(persistKey), false); // restore last session quietly — the host reads params on init
   }
-  listPresets = () => { const p = presetsKey ? readStore(presetsKey) : null; return p && typeof p === "object" ? p : {}; };
+  listPresets = () => { const p = presetsKey ? readStore(presetsKey) : null; return Object.assign(Object.create(null), p && typeof p === "object" ? p : {}); }; // null-proto: a preset named "__proto__" is an ordinary key (a plain object's assignment wrote the prototype — savePreset claimed success while storing nothing, loadPreset applied Object.prototype)
   savePreset = (nm) => { if (!presetsKey || !nm) return false; const all = listPresets(); all[nm] = snapshot(); writeStore(presetsKey, all); return true; };
   loadPreset = (nm) => { const all = listPresets(); if (all[nm]) { applySnapshot(all[nm]); return true; } return false; };
   deletePreset = (nm) => { if (!presetsKey) return; const all = listPresets(); delete all[nm]; writeStore(presetsKey, all); };
@@ -946,8 +979,14 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
     };
     header.addEventListener("pointerup", endDrag);
     header.addEventListener("pointercancel", endDrag);
-    // Keep a floated panel inside the viewport as the window resizes.
-    window.addEventListener("resize", () => { if (panel.dataset.mode === "floating") { const { maxX, maxY } = bounds(); px = clamp(px, MARGIN, maxX); py = clamp(py, MARGIN, maxY); apply(); } });
+    // Keep a floated panel inside the viewport as the window resizes. Self-cleans on
+    // the first resize after the panel leaves the DOM (this listener leaked per
+    // draggable panel, holding the panel alive — the slider's resize pattern).
+    const onWinResize = () => {
+      if (!panel.isConnected) return window.removeEventListener("resize", onWinResize);
+      if (panel.dataset.mode === "floating") { const { maxX, maxY } = bounds(); px = clamp(px, MARGIN, maxX); py = clamp(py, MARGIN, maxY); apply(); }
+    };
+    window.addEventListener("resize", onWinResize);
   }
 
   if (presetsBtn) {
@@ -1027,12 +1066,17 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
     undo = () => { flush(); if (histIdx > 0) restore(histIdx - 1); };
     redo = () => { flush(); if (histIdx < history.length - 1) restore(histIdx + 1); };
     const focused = () => panel.matches(":hover") || panel.contains(document.activeElement);
-    document.addEventListener("keydown", (e) => {
+    // Self-clean like the slider's resize listener: the first keydown after the panel
+    // leaves the DOM drops the listener (it held the whole panel + history alive
+    // forever — a permanent leak per undo panel).
+    const onUndoKey = (e) => {
+      if (!panel.isConnected) return document.removeEventListener("keydown", onUndoKey);
       if (!focused() || !(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       else if (k === "y") { e.preventDefault(); redo(); }
-    });
+    };
+    document.addEventListener("keydown", onUndoKey);
   }
   }; // end assemble
 
@@ -1042,7 +1086,13 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const api: any = {
     el: panel, params,
     on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    set(key, v) { const e = entries.find((x) => x.target === params && x.key === key); if (e) { e.set(v); params[key] = e.get(); } else params[key] = v; notify(); },
+    set(key, v) {
+      const e = entries.find((x) => x.target === params && x.key === key);
+      if (e) { e.set(v); params[key] = e.get(); }
+      else if (subTrees.has(params[key])) return console.warn(`[tweaks] set("${key}") ignored — it's a folder/tabs group; set its children instead`); // overwriting the subtree would silently orphan every child value
+      else params[key] = v;
+      params._last = key; notify(); // stamp the changed key, so on((p, last)) sees programmatic sets the same as control edits
+    },
     reset() { resetBtn.click(); },
     // Live theming — re-applies --tw-* vars to the panel (and future popovers). Clears
     // the prior theme first, so setTheme(null) reverts to the default monochrome look.

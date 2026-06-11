@@ -28,13 +28,19 @@ const inferStep = (min, max) => {
   if (range <= 100) return 1;
   return 10;
 };
-// Default upper bound for a numeric entry with no explicit max: a 0–1 value keeps a
-// 0–1 range, otherwise 3× the value (100 as a last resort). Shared by the bare-number
+// Default range for a numeric entry with no explicit bounds: 0–1 keeps a 0–1 range,
+// a positive spans 0–3× (100 as a last resort), and a negative mirrors that below
+// zero (−1–0 / 3×–0) — a negative default used to produce max −3×|v| with min 0, an
+// inverted range that clamped the value to the wrong end. Shared by the bare-number
 // and short-array schema branches so the heuristic lives in one place.
-const defaultMax = (v) => (v <= 1 && v >= 0 ? 1 : v * 3 || 100);
+const defaultRange = (v) => (v >= 0 ? [0, v <= 1 ? 1 : v * 3 || 100] : [v >= -1 ? -1 : v * 3, 0]);
 
-const optValue = (o) => (o == null ? undefined : typeof o === "string" ? o : o.value);
-const optLabel = (o) => (typeof o === "string" ? titleCase(o) : o.label);
+// Options may be strings, { value, label } objects, or bare primitives (numbers,
+// booleans — e.g. a five-number array inferring as a list): a primitive is its own
+// value, labelled by its string form. (Primitives used to fall into the object arm
+// and read `.value` off a number — empty labels, undefined values.)
+const optValue = (o) => (o == null ? undefined : typeof o === "object" ? o.value : o);
+const optLabel = (o) => (o == null ? "" : typeof o === "string" ? titleCase(o) : typeof o === "object" ? o.label : String(o));
 
 const svgNS = "http://www.w3.org/2000/svg";
 // el/svgEl return `any` on purpose: they're the internal DOM factory, used as div /
@@ -208,7 +214,9 @@ const stretchPill = (pill, dir) => {
 const setRadioActive = (btns, value) => btns.forEach((b) => { const on = b.dataset.value === String(value); b.dataset.active = String(on); b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; });
 // A single-select radio button — the segmented pill and the radio-grid cell wire the
 // role + value + click identically; only the class and container differ. onPick(value).
-const radioButton = (cls, o, onPick) => { const b = el("button", cls); b.type = "button"; b.setAttribute("role", "radio"); b.textContent = optLabel(o); b.dataset.value = optValue(o); b.addEventListener("click", () => onPick(optValue(o))); return b; };
+// _twVal carries the option's real value — dataset stringifies, so a keyboard pick
+// reading dataset.value turned a numeric option into a string (type flipped by input method).
+const radioButton = (cls, o, onPick) => { const b = el("button", cls); b.type = "button"; b.setAttribute("role", "radio"); b.textContent = optLabel(o); b.dataset.value = optValue(o); b._twVal = optValue(o); b.addEventListener("click", () => onPick(b._twVal)); return b; };
 
 // Tweakpane-style grab guide — a dotted line from the grab point to the cursor
 // plus a floating value bubble, portaled to <body> for the duration of a drag.
@@ -286,7 +294,7 @@ export const registerControl = (type, ctor) => { REGISTRY[type] = ctor; };
 export const getControl = (type) => REGISTRY[type];
 
 export {
-  titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultMax,
+  titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, svgEl, cssVar, accentColor, stopPointerLeak, onReady,
   wireHoverClass, dragGesture, boxFrac, fitCanvas, popover,
   resolveTheme, applyThemeVars, fuzzyMatch, setRadioActive, radioButton,

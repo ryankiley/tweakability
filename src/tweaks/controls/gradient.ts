@@ -19,10 +19,12 @@ function normalizeStops(value) {
   const arr = Array.isArray(value) ? value : (value && Array.isArray(value.stops) ? value.stops : null);
   // Map each entry defensively — a [color, pos] tuple or a { color, pos } object — and
   // drop anything else (a null / garbage element would throw on `.color`); coerce a
-  // non-finite pos to 0. Fewer than two usable stops falls back to the default pair.
+  // non-finite pos to 0 and clamp into [0,1] (an out-of-range pos rendered its handle
+  // outside the popover — the drag clamps, so input does too). Fewer than two usable
+  // stops falls back to the default pair.
   const out = (arr || []).map((s) => {
-    if (Array.isArray(s)) return { color: String(s[0]), pos: +s[1] || 0 };
-    if (s && typeof s === "object") return { color: String(s.color), pos: +s.pos || 0 };
+    if (Array.isArray(s)) return { color: String(s[0]), pos: clamp(+s[1] || 0, 0, 1) };
+    if (s && typeof s === "object") return { color: String(s.color), pos: clamp(+s.pos || 0, 0, 1) };
     return null;
   }).filter(Boolean);
   return out.length >= 2 ? out : DEF;
