@@ -159,9 +159,12 @@ function popover(root: any, trigger: any, pop: any, opts: { width?: number | "ma
     open = true; root.classList.add("is-open"); trigger.setAttribute("aria-expanded", "true");
     document.body.appendChild(pop);
     applyThemeVars(pop, root.closest(".tw-panel")?._twTheme); // carry the host panel's theme onto the portaled popover
-    // Carry the nearest forced scheme too — the portal escapes the subtree, so the
+    // Carry the forced scheme too — the portal escapes the subtree, so the
     // [data-tw-scheme] scope that styles the panel can't reach it via the cascade.
-    const scheme = root.closest("[data-tw-scheme]")?.getAttribute("data-tw-scheme");
+    // Copy the WINNING scheme, not the nearest: pins resolve flat (a light pin
+    // anywhere outranks dark — see the scheme-resolution comment in tweaks.css), so
+    // nearest-wins under light>dark nesting would put a dark popover on a light panel.
+    const scheme = root.closest('[data-tw-scheme="light"]') ? "light" : root.closest('[data-tw-scheme="dark"]') ? "dark" : null;
     if (scheme) pop.setAttribute("data-tw-scheme", scheme); else pop.removeAttribute("data-tw-scheme");
     place();
     requestAnimationFrame(() => { pop.classList.add("is-open"); opts.onOpen && opts.onOpen(); place(); }); // render at real size, then re-place (height may have changed)

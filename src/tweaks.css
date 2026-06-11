@@ -827,15 +827,19 @@
 /* ── Scheme resolution ──────────────────────────────────────────────────────────
  * The default look is dark. Panels follow the OS to light unless an ancestor pins
  * them with [data-tw-scheme="dark"]; [data-tw-scheme="light"] on any ancestor forces
- * light regardless of OS. Portaled surfaces (popovers, dropdowns, menus) copy the
- * nearest scheme attribute from their trigger when they open (see popover() in
- * shared), so a forced subtree carries its popovers with it. The :where() guards keep
- * every rule at base class specificity, so theme()/setTheme() overrides behave
- * exactly as before. The light token block appears TWICE — once media-driven, once
- * attribute-forced; CSS can't share one block across a media query and a selector.
- * The two copies must stay declaration-identical — build.mjs diffs them and fails the
- * build on drift. Nesting schemes (a light scope inside a dark scope) is not
- * supported: any dark-pinned ancestor wins. */
+ * light regardless of OS. Pins resolve flat, not nested: a light pin anywhere in the
+ * ancestor chain forces light, outranking any dark pin in either nesting order (the
+ * forced-light block below carries no dark guard and sits after the dark defaults,
+ * so at equal specificity it wins). That keeps the pin's home case working — a light
+ * island inside a dark-pinned host page — at the cost of the reverse: a dark pin
+ * inside a light scope cannot re-darken its subtree. Portaled surfaces (popovers,
+ * dropdowns, menus) copy that same winning scheme from their trigger when they open
+ * (see popover() in shared), so a forced subtree carries its popovers with it. The
+ * :where() guards keep every rule at base class specificity, so theme()/setTheme()
+ * overrides behave exactly as before. The light token block appears TWICE — once
+ * media-driven, once attribute-forced; CSS can't share one block across a media query
+ * and a selector. The two copies must stay declaration-identical — build.mjs diffs
+ * them and fails the build on drift. */
 @media (prefers-color-scheme: light) {
   .tw-panel:where(:not([data-tw-scheme="dark"]):not([data-tw-scheme="dark"] *)) {
     /* Mirrors dark mode's tonal logic: an off-white base with item containers a step
