@@ -157,41 +157,50 @@ a { color: var(--site-accent); text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Copy button — the kit's own copy ⇄ check icon swap (opacity + scale + blur
- * cross-fade), revealed on hover, with an inverted-ink tooltip from aria-label. */
+/* Copy button — the kit's copy ⇄ check icon swap (opacity + scale + blur cross-fade),
+ * revealed on hover. Tuned per the design system: a borderless ink button (no box to
+ * pixel-snap), block-level icons promoted to their own compositor layer (will-change)
+ * so the blur/scale swap renders steady, and an inverted-ink tooltip with a quick
+ * ease-in hide / soft ease-out show. */
 .ex-copy {
-  position: absolute; top: 8px; right: 8px;
-  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-  color: var(--site-muted);
-  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--site-border);
-  border-radius: 8px; cursor: pointer; opacity: 0;
-  transition: opacity var(--site-dur-fast) var(--site-ease-out), color var(--site-dur-fast) var(--site-ease-out);
+  position: absolute; top: 6px; right: 6px; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 8px; border: none; background: transparent; border-radius: 8px;
+  color: var(--site-muted); cursor: pointer; opacity: 0;
+  transition: opacity var(--site-dur-base) var(--site-ease-out), color var(--site-dur-fast) var(--site-ease-out);
 }
 .ex-codewrap:hover .ex-copy, .ex-copy:focus-visible { opacity: 1; }
 .ex-copy:hover { color: var(--site-text); }
-.ex-copy.is-copied { color: #9ece6a; opacity: 1; }
-.ex-copy-icons { position: relative; width: 14px; height: 14px; }
+.ex-copy.is-copied { opacity: 1; }
+.ex-copy-icons { position: relative; display: block; width: 15px; height: 15px; }
 .ex-copy-icons svg {
-  position: absolute; inset: 0; width: 14px; height: 14px;
+  position: absolute; inset: 0; display: block; width: 15px; height: 15px;
   transition: opacity var(--site-dur-base) var(--site-ease-out),
               transform var(--site-dur-base) var(--site-ease-out),
               filter var(--site-dur-base) var(--site-ease-out);
+  will-change: opacity, transform, filter;
 }
-.ex-copy-check { opacity: 0; transform: scale(0.25); filter: blur(2px); }
+.ex-copy-check { opacity: 0; transform: scale(0.25); filter: blur(2px); color: #9ece6a; }
 .ex-copy.is-copied .ex-copy-copy { opacity: 0; transform: scale(0.25); filter: blur(2px); }
 .ex-copy.is-copied .ex-copy-check { opacity: 1; transform: none; filter: none; }
 .ex-copy::after {
   content: attr(aria-label);
-  position: absolute; top: calc(100% + 6px); right: 0;
-  padding: 3px 8px; border-radius: 6px; white-space: nowrap;
-  font: 600 11px/1.5 inherit; font-family: inherit;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 2;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+  font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.3;
   background: var(--site-text); color: var(--site-bg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   opacity: 0; transform: translateY(4px) scale(0.96); transform-origin: top right;
   pointer-events: none;
+  transition: opacity calc(var(--site-dur-base) * 0.6) ease-in, transform calc(var(--site-dur-base) * 0.6) ease-in;
+}
+.ex-copy:hover::after, .ex-copy:focus-visible::after {
+  opacity: 1; transform: none;
   transition: opacity var(--site-dur-base) var(--site-ease-out), transform var(--site-dur-base) var(--site-ease-out);
 }
-.ex-copy:hover::after, .ex-copy:focus-visible::after { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ex-copy::after { transition: opacity var(--site-dur-fast) ease; transform: none; }
+}
 .ex-note { font-size: 12.5px; color: var(--site-faint); margin-top: -6px; }
 
 /* ── Highlighter tokens — vivid, anchored on the kit's violet ── */
