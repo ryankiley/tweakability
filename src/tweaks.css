@@ -812,9 +812,12 @@
 .tw-plot.is-invalid .tw-plot-field { box-shadow: inset 0 0 0 1px rgba(255, 95, 95, 0.6); }
 .tw-plot.is-invalid .tw-plot-fx { color: rgba(255, 95, 95, 0.8); }
 
-/* ── Light theme — flips with the page (the site is color-scheme: light dark) ── */
+/* ── Light theme — follows the OS preference, unless the host page declares itself
+ * dark-only with <html data-tw-scheme="dark"> (the docs site does; any embedder with a
+ * fixed dark design wants the same). The :where() guards keep specificity identical to
+ * the unguarded rules, so theme()/setTheme() overrides behave exactly as before. ── */
 @media (prefers-color-scheme: light) {
-  .tw-panel {
+  :where(html:not([data-tw-scheme="dark"])) .tw-panel {
     /* Mirrors dark mode's tonal logic: an off-white base with item containers a step
      * brighter (white), rather than darker films on white. Items go lighter than the
      * base, same gentle step as dark. Hover/active stay subtle darkenings so fills and
@@ -844,9 +847,9 @@
     --tw-success: #15803d;
   }
   /* Light mode: thumb/handle need definition — a subtle thumb shadow */
-  .tw-slider-handle { box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+  :where(html:not([data-tw-scheme="dark"])) .tw-slider-handle { box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
   /* Portaled popovers carry their own tokens — flip them to light too. */
-  .tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu {
+  :where(html:not([data-tw-scheme="dark"])) :is(.tw-color-pop, .tw-select-dropdown, .tw-grab-guide, .tw-presets-menu) {
     --tw-surface: rgba(255, 255, 255, 0.82); --tw-surface-hover: rgba(0, 0, 0, 0.04);
     --tw-surface-active: rgba(0, 0, 0, 0.1);
     --tw-text-label: rgba(0, 0, 0, 0.58); --tw-text-primary: rgba(0, 0, 0, 0.88);
