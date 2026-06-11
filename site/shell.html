@@ -1,14 +1,13 @@
 <!doctype html>
-<!-- data-tw-scheme="dark": the site is dark-only; pin the kit's dark theme even on
-     light-OS visitors (the kit's light flip keys off prefers-color-scheme). -->
-<html lang="en" data-tw-scheme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="light dark" />
   <title>{{title}}</title>
   <meta name="description" content="{{description}}" />
-  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0f0f" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f1f1f1" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="{{title}}" />
   <meta property="og:description" content="{{description}}" />

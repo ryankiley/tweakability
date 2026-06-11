@@ -31,8 +31,8 @@ export const examples = [
       This page runs the split build — the stamp shows the real load.</p>`,
     target: `<code class="im-stamp">…</code>`,
     css: `
-      .im-stamp { font-size: 13px; color: #9a9a9a; background: rgba(255, 255, 255, 0.05);
-                  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 14px; }`,
+      .im-stamp { font-size: 13px; color: var(--demo-muted); background: var(--demo-fill);
+                  border: 1px solid var(--demo-line); border-radius: 8px; padding: 8px 14px; }`,
     run: ({ tweaks, mount, target }) => {
       const stamp = target.querySelector(".im-stamp");
       const t0 = performance.now();

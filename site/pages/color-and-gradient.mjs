@@ -31,8 +31,8 @@ export const examples = [
     css: `
       .col-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
       .col-blob path { transition: fill 0.1s; }
-      .col-readout { font-size: 12.5px; color: #9a9a9a; background: rgba(255,255,255,0.05);
-                     border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 3px 10px; }`,
+      .col-readout { font-size: 12.5px; color: var(--demo-muted); background: var(--demo-fill);
+                     border: 1px solid var(--demo-line); border-radius: 7px; padding: 3px 10px; }`,
     run: ({ tweaks, mount, target }) => {
       const blob = target.querySelector(".col-blob path");
       const readout = target.querySelector(".col-readout");
@@ -59,7 +59,7 @@ export const examples = [
     target: `<div class="grad-swatch"></div>`,
     css: `
       .grad-swatch { width: 100%; height: 120px; border-radius: 14px; align-self: center;
-                     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }`,
+                     box-shadow: inset 0 0 0 1px var(--demo-line); }`,
     run: ({ tweaks, mount, target }) => {
       const swatch = target.querySelector(".grad-swatch");
       const panel = tweaks("Gradient", {
@@ -89,9 +89,9 @@ export const examples = [
     target: `<div class="img-tile"><span>Drop an image on the control →</span></div>`,
     css: `
       .img-tile { display: grid; place-items: center; width: 220px; height: 170px; border-radius: 16px;
-                  background-color: rgba(255, 255, 255, 0.04); background-size: cover; background-position: center;
-                  border: 1px solid rgba(255, 255, 255, 0.09); }
-      .img-tile span { max-width: 18ch; text-align: center; font-size: 12.5px; color: #6f6f6f; }`,
+                  background-color: var(--demo-fill-soft); background-size: cover; background-position: center;
+                  border: 1px solid var(--demo-line); }
+      .img-tile span { max-width: 18ch; text-align: center; font-size: 12.5px; color: var(--demo-faint); }`,
     run: ({ tweaks, mount, target }) => {
       const tile = target.querySelector(".img-tile");
       const panel = tweaks("Image", {
