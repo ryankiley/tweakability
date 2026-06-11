@@ -219,12 +219,18 @@
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__copy { opacity: 0; transform: scale(0.25); filter: blur(2px); }
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__check { opacity: 1; transform: none; filter: blur(0); }
 /* Reset: a small clockwise wind-up on hover, then it releases into a counter-clockwise
- * spin on click (the spin starts from the wound-up angle so it unwinds smoothly).
+ * spin on click. The rotation is one transitioned transform — rotate(--tw-spin + --tw-wind) —
+ * where hover sets --tw-wind (22deg / 0) and each click accumulates −360deg onto --tw-spin
+ * (JS spinReset). No keyframes: transitions retarget mid-flight, so a second click mid-spin
+ * continues smoothly into the next turn from the current angle, the spin always lands on
+ * the live resting angle (hovered or not), and a click mid-wind-up unwinds from wherever
+ * it is — "interruptible beats staged". is-spinning lengthens the transition for the
+ * spin's run; spinReset renormalises the counter to 0 once settled (−n·360° is the same
+ * angle, so nothing visibly moves).
  * will-change keeps it on its compositor layer across hover/spin — same Safari fix. */
-.tw-toolbar-btn--reset svg { will-change: transform; transition: transform 0.34s cubic-bezier(0.34, 1.55, 0.5, 1); }
-.tw-toolbar-btn--reset:hover svg { transform: rotate(22deg); }
-@keyframes tw-reset-spin { from { transform: rotate(22deg); } to { transform: rotate(-360deg); } }
-.tw-toolbar-btn--reset.is-spinning svg { animation: tw-reset-spin 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-toolbar-btn--reset svg { --tw-spin: 0deg; --tw-wind: 0deg; will-change: transform; transform: rotate(calc(var(--tw-spin) + var(--tw-wind))); transition: transform 0.34s cubic-bezier(0.34, 1.55, 0.5, 1); }
+.tw-toolbar-btn--reset:hover svg { --tw-wind: 22deg; }
+.tw-toolbar-btn--reset.is-spinning svg { transition-duration: 0.5s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
 
 /* Focus rings drawn INSIDE the control — the controls stack is overflow:hidden
  * (for the collapse animation), so an outset outline would clip at the edges. */
@@ -246,10 +252,14 @@
  * reset handler on touch instead of zooming the page. */
 .tw-resettable { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* Press-and-hold reset feedback (coarse pointers): a subtle surface fill charges over
-   the hold window, completing as the reset fires. Reduced motion shows it filled, no sweep. */
-.tw-reset-holding { border-radius: calc(var(--tw-radius) - 4px); animation: tw-reset-hold 0.5s ease-out forwards; }
-@keyframes tw-reset-hold { from { background-color: transparent; } to { background-color: var(--tw-surface-active, rgba(128, 128, 128, 0.22)); } }
-@media (prefers-reduced-motion: reduce) { .tw-reset-holding { animation: none; background-color: var(--tw-surface-active, rgba(128, 128, 128, 0.22)); } }
+   the hold window, completing as the reset fires. A transition, not a forwards keyframe —
+   a hold is user-reversible, so an early release DRAINS the fill (the 0.3s below)
+   instead of cutting it ("interruptible beats staged"). The 0.5s charge paces the hold
+   timer; reduced motion gets it instantly via the global transition kill. Doubled class:
+   targets like .tw-slider-value declare their own `transition: color`, which ties on
+   specificity and would win on source order — so these carry the color fade with them. */
+.tw-resettable.tw-resettable { transition: color 0.15s, background-color 0.3s ease-out; }
+.tw-resettable.tw-reset-holding { border-radius: calc(var(--tw-radius) - 4px); background-color: var(--tw-surface-active, rgba(128, 128, 128, 0.22)); transition: color 0.15s, background-color 0.5s ease-out; }
 
 /* ── Slider ── */
 .tw-slider-wrap { position: relative; height: var(--tw-row-height); }
@@ -861,8 +871,7 @@
 .specimen:has(.tw-panel) { display: grid; justify-items: center; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tw-panel * { transition: none !important; }
-  .tw-toolbar-btn--reset.is-spinning svg { animation: none; }
+  .tw-panel * { transition: none !important; } /* also neutralises the reset spin + hold charge, both transitions now — an instant −360° rotation is no visual change at all */
   /* Neutralise the one-shot keyframe entrances too (the transition kill above doesn't touch animations). */
   .tw-tabs-page[data-active="true"], .tw-grab-bubble { animation: none; }
 }
