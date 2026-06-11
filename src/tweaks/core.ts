@@ -684,6 +684,10 @@ function showHint(anchor, text, themeVars) {
   clearTimeout(hintTimer);
   hintTip.textContent = text;
   applyThemeVars(hintTip, themeVars);
+  // Carry the nearest scheme scope, popover()-style — the tip portals to <body>, so a
+  // [data-tw-scheme] scope that styles the panel can't reach it via the cascade.
+  const scheme = anchor.closest("[data-tw-scheme]")?.getAttribute("data-tw-scheme");
+  if (scheme) hintTip.setAttribute("data-tw-scheme", scheme); else hintTip.removeAttribute("data-tw-scheme");
   hintTip.style.visibility = "hidden"; hintTip.classList.add("is-open");
   const r = anchor.getBoundingClientRect(), w = hintTip.offsetWidth, h = hintTip.offsetHeight;
   const left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8);
