@@ -85,7 +85,7 @@ function createGradient(meta, onChange) {
         // preventDefault suppresses click-to-focus on the button — focus explicitly so
         // keyboard can take over after a grab. The focus also blurs a dirty channel
         // field while the old stop is still selected, so its commit lands there.
-        onDown: (e) => { e.preventDefault(); e.stopPropagation(); h.focus(); select(s, false); offBar = false; },
+        onDown: (e) => { e.preventDefault(); e.stopPropagation(); h.focus({ focusVisible: false }); select(s, false); offBar = false; }, // focus for keyboard + to commit a dirty channel field, but no keyboard ring on a mouse press; Tab still rings
         onMove: (e) => {
           s.pos = posFromX(e.clientX); h.style.left = s.pos * 100 + "%"; paint(); emit();
           // Drag a stop clear of the bar (past ~24px above/below) to remove it — the

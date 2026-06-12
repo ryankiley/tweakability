@@ -294,7 +294,7 @@ function createSlider(meta, onChange) {
     if (valueEl.classList.contains("is-editing")) return;
     if (e.button !== 0 || downPos) return; // primary button only; a second pointer can't hijack a live drag
     e.preventDefault();
-    track.focus(); // preventDefault suppressed click-to-focus — restore it, so click-then-arrow-keys works
+    track.focus({ focusVisible: false }); // restore click-to-focus (preventDefault suppressed it) so click-then-arrow-keys works — but WITHOUT the keyboard focus ring: a mouse press shouldn't draw :focus-visible (programmatic focus otherwise reads as keyboard to the browser). Keyboard Tab still rings. Option is ignored on browsers that lack it (no regression).
     downId = e.pointerId;
     try { e.target.setPointerCapture(e.pointerId); } catch {}
     clearTimeout(snapTimer); track.style.transition = "";

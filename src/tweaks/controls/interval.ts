@@ -80,7 +80,7 @@ function createInterval(meta, onChange) {
     rect = wrap.getBoundingClientRect(); scale = rect.width / (wrap.offsetWidth || rect.width);
     track.classList.add("is-active", "is-dragging"); active = null;
     grab(e.clientX);
-    (active === "lo" ? hLo : hHi).focus(); // preventDefault suppressed click-to-focus — hand keyboard to the grabbed handle
+    (active === "lo" ? hLo : hHi).focus({ focusVisible: false }); // hand keyboard to the grabbed handle (preventDefault suppressed click-to-focus) without the keyboard ring on a mouse press; Tab still rings
   });
   track.addEventListener("pointermove", (e) => { if (!rect || e.pointerId !== pid) return; if (e.buttons === 0) { up(); return; } grab(e.clientX); });
   const up = (e?) => { if (e && e.pointerId !== pid) return; rect = null; active = null; pid = null; track.classList.remove("is-active", "is-dragging"); };

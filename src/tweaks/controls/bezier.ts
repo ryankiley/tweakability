@@ -59,7 +59,7 @@ function createBezier(meta, onChange) {
       // Divide out any ancestor CSS transform (rect is visual px, offsetWidth layout px) —
       // interval's valFromX correction. preventDefault suppresses click-to-focus on the
       // button, so focus explicitly and keyboard can take over after a grab.
-      onDown: (e) => { e.preventDefault(); rect = graph.getBoundingClientRect(); gw = graph.offsetWidth || rect.width; gh = graph.offsetHeight || rect.height; scale = rect.width / gw; handle.classList.add("is-dragging"); handle.focus(); },
+      onDown: (e) => { e.preventDefault(); rect = graph.getBoundingClientRect(); gw = graph.offsetWidth || rect.width; gh = graph.offsetHeight || rect.height; scale = rect.width / gw; handle.classList.add("is-dragging"); handle.focus({ focusVisible: false }); }, // focus for keyboard nudging, but no keyboard ring on a mouse press; Tab still rings
       onMove: (e) => {
         const gx = (e.clientX - rect.left) / scale, gy = (e.clientY - rect.top) / scale;
         const x = clamp((gx - PAD) / (gw - 2 * PAD), 0, 1);
