@@ -81,6 +81,22 @@ const wireHoverClass = (el, onEnter) => {
   el.addEventListener("pointerenter", () => { el.classList.add("is-hover"); onEnter && onEnter(); });
   el.addEventListener("pointerleave", () => el.classList.remove("is-hover"));
 };
+// ── Quiet mouse focus — :focus-visible always matches a focused text field, however
+// focus arrived (the spec treats text entry as "keyboard imminent"), so a plain click
+// into one drew the heavy keyboard ring. The text-field counterpart of the sliders'
+// focus({ focusVisible: false }): one document-level modality note (a pointer press
+// quiets the next focus, any key restores the ring — so Tab always rings, and the
+// note arriving mid-edit doesn't re-ring a field being typed in). The pair of
+// capture listeners installs once per page, shared by every panel. ──
+let pointerModality = false;
+if (typeof document !== "undefined") {
+  document.addEventListener("pointerdown", () => { pointerModality = true; }, true);
+  document.addEventListener("keydown", () => { pointerModality = false; }, true);
+}
+const quietFocus = (input) => {
+  input.addEventListener("focus", () => input.classList.toggle("tw-focus-quiet", pointerModality));
+  input.addEventListener("blur", () => input.classList.remove("tw-focus-quiet"));
+};
 // Press-drag on a node: onDown fires on pointerdown (pointer captured), onMove on
 // each move; it ends on pointerup/cancel or when the button releases off the node
 // (buttons===0), then onEnd runs. The shape behind the colour plane/strips, the
@@ -370,6 +386,7 @@ function numField(spec, onChange) {
   const wrap = el("div", "tw-num-wrap");
   const grab = el("span", "tw-num-grab", ICON_GRIP); grab.setAttribute("aria-hidden", "true"); grab.title = "Drag to adjust";
   const inp = el("input", "tw-num"); inp.type = "text"; inp.inputMode = "decimal"; inp.setAttribute("aria-label", spec.label); inp.value = value.toFixed(decimals);
+  quietFocus(inp); // click-to-edit stays ringless; Tab rings
   wrap.append(grab, inp); root.append(txt("span", spec.row ? "tw-row-label" : "tw-field-label", spec.label), wrap);
   const set = (val, fire = true) => { val = +val; if (!Number.isFinite(val)) return; value = fit(val); inp.value = value.toFixed(decimals); if (fire && onChange) onChange(value); };
   inp.addEventListener("change", () => { const p = parseFloat(inp.value); set(isNaN(p) ? value : p); });
@@ -397,6 +414,6 @@ export {
   optValue, optLabel, el, btn, txt, svgEl, cssVar, accentColor, stopPointerLeak, onReady, onLive,
   wireHoverClass, dragGesture, boxFrac, fitCanvas, popover, closeActivePopover,
   resolveTheme, applyThemeVars, carryScheme, carrySkin, fuzzyMatch, setRadioActive, radioButton, navIndex, triggerRow,
-  numField, blade, stretchPill, REDUCE_MOTION,
+  numField, blade, quietFocus, stretchPill, REDUCE_MOTION,
 };
 

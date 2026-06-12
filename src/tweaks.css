@@ -267,15 +267,21 @@
  * place. Inset (−2): anything inside the controls stack, which is overflow:hidden
  * for the collapse animation (an outset ring would clip), plus the typeable fields,
  * whose border-tone shift (~1.3:1) isn't a visible cue on its own. Outset (+1): the
- * compact chips with room around them. Outset (+2): the free-floating drag handles. */
+ * compact chips with room around them. Outset (+2): the free-floating drag handles.
+ * The typeable fields carry :not(.tw-focus-quiet): :focus-visible matches a focused
+ * text field however focus arrived, so a plain CLICK into one drew the keyboard
+ * ring — quietFocus (shared.ts) marks pointer-origin focus; Tab still rings. */
 .tw-trigger:focus-visible, .tw-select-trigger:focus-visible, .tw-button:focus-visible,
 .tw-seg-btn:focus-visible, .tw-header-toggle:focus-visible, .tw-folder-header:focus-visible,
 .tw-slider:focus-visible, .tw-radiogrid-btn:focus-visible, .tw-buttongroup-btn:focus-visible, .tw-tabs-tab:focus-visible,
-.tw-text:focus-visible, .tw-num:focus-visible, .tw-color-chan-input:focus-visible, .tw-search:focus-visible, .tw-color-mode:focus-visible,
-.tw-presets-load:focus-visible, .tw-presets-savebtn:focus-visible, .tw-presets-del:focus-visible, .tw-presets-input:focus-visible {
+.tw-text:focus-visible:not(.tw-focus-quiet), .tw-num:focus-visible:not(.tw-focus-quiet),
+.tw-color-chan-input:focus-visible:not(.tw-focus-quiet), .tw-search:focus-visible:not(.tw-focus-quiet), .tw-color-mode:focus-visible,
+.tw-presets-load:focus-visible, .tw-presets-savebtn:focus-visible, .tw-presets-del:focus-visible, .tw-presets-input:focus-visible:not(.tw-focus-quiet) {
   outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: -2px;
 }
-.tw-toolbar-btn:focus-visible, .tw-gradient-stop:focus-visible, .tw-gradient-add:focus-visible, 
+.tw-toolbar-btn:focus-visible, .tw-image-drop:focus-visible { outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: 1px; }
+.tw-gradient-stop:focus-visible, .tw-gradient-add:focus-visible, .tw-bezier-handle:focus-visible { outline: 2px solid var(--tw-accent, var(--tw-text-focus)); outline-offset: 2px; }
+
 /* ── Controls stack ── */
 .tw-controls { display: flex; flex-direction: column; gap: 6px; }
 /* Conditional render (render:(get)=>bool) hides the control; disabled greys + locks it. */
@@ -687,6 +693,7 @@
   flex: 1; min-width: 0; font: inherit; font-size: 12px; font-weight: 500;
   color: var(--tw-text-label); background: transparent; border: none; outline: none;
   text-align: right; cursor: text; padding: 0;
+  border-radius: calc(var(--tw-radius) - 4px); /* invisible on the transparent field — it rounds the keyboard focus ring (outline follows border-radius) */
 }
 .tw-num { font-family: var(--tw-font-sans); }
 .tw-text:focus, .tw-num:focus { color: var(--tw-text-focus); }

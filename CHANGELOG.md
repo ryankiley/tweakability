@@ -23,6 +23,17 @@
   consumes — one derivation, so the two entry points can't drift again.
 - Focus-visible rules consolidated to one block (one ring, three offsets).
 - Numeric field inputs and the picker's mode select / hex input carry aria-labels.
+- The spring preview's drag (curve-area tuning) rides the shared `dragGesture` —
+  same behaviour, plus the single-pointer guard (a second finger could fork the
+  hand-rolled drag) and the buttons-released-off-element self-heal.
+
+### Fixed
+- Clicking into a text field (the text control, textarea, number fields, search,
+  preset name, hex) no longer draws the keyboard focus ring — `:focus-visible`
+  always matches a focused text field whatever moved focus there, so the typeable
+  fields' ring fired on plain mouse clicks. A one-page modality note (`quietFocus`)
+  keeps pointer-origin focus quiet; Tab still rings, and the ring is now rounded
+  on the borderless fields instead of a sharp rectangle.
 
 ### Added
 - Test suite (`npm test`, Node's built-in runner): wide-gamut conversion round-trips,

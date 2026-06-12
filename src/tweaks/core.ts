@@ -15,7 +15,7 @@
 import {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, btn, txt, popover, placeBelow, closeActivePopover, stopPointerLeak, applyThemeVars, resolveTheme, carryScheme, carrySkin, onReady, onLive,
-  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, numField, blade, stretchPill, REDUCE_MOTION,
+  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, numField, blade, quietFocus, stretchPill, REDUCE_MOTION,
   registerControl, getControl,
 } from "./shared.js";
 import type { Schema, TweaksOptions, Panel, Params } from "./types.js";
@@ -558,6 +558,7 @@ function createString(meta, onChange) {
   const input = el(multi ? "textarea" : "input", multi ? "tw-text tw-textarea" : "tw-text");
   if (multi) input.rows = meta.rows; else input.type = "text";
   input.value = value;
+  quietFocus(input); // click-to-type stays ringless; Tab rings
   if (meta.placeholder) input.placeholder = meta.placeholder;
   input.addEventListener("input", () => { value = input.value; onChange(value); });
   row.append(txt("span", "tw-row-label", meta.label), input);
@@ -792,6 +793,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const searchInput = filterOn ? el("input", "tw-search") : null;
   if (filterOn) {
     searchInput.type = "text"; searchInput.placeholder = "Filter…"; searchInput.spellcheck = false; searchInput.setAttribute("aria-label", "Filter controls");
+    quietFocus(searchInput);
     toolbar.append(searchBtn);
   }
   toolbar.append(copyBtn, resetBtn);
@@ -1086,7 +1088,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   if (presetsBtn) {
     const menu = el("div", "tw-presets-menu");
     const saveRow = el("div", "tw-presets-save");
-    const input = el("input", "tw-presets-input"); input.type = "text"; input.placeholder = "Preset name…"; input.spellcheck = false; input.setAttribute("aria-label", "New preset name");
+    const input = el("input", "tw-presets-input"); input.type = "text"; input.placeholder = "Preset name…"; input.spellcheck = false; input.setAttribute("aria-label", "New preset name"); quietFocus(input);
     const saveBtn = txt("button", "tw-presets-savebtn", "Save"); saveBtn.type = "button";
     saveRow.append(input, saveBtn);
     const list = el("div", "tw-presets-list");

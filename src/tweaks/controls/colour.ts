@@ -1,6 +1,6 @@
 // ── Colour — wide-gamut OKLCH picker. Lazy: dynamic-imported on first use, and
 // the only module that loads wide-gamut.js (so basic panels never pay for it).
-import { el, txt, clamp, dragGesture, boxFrac, numField, popover, triggerRow, registerControl } from "../shared.js";
+import { el, txt, clamp, dragGesture, boxFrac, numField, popover, triggerRow, quietFocus, registerControl } from "../shared.js";
 import { oklchGamutProbe, chromaCeil, hexByte, oklchToHex, hexToOklch, channelValues, withChannel, gamutLabel, showsGamutBoundary, readout, EDIT_MODES, MODE_LABELS, MODE_CHANNELS, convert, num } from "../../wide-gamut.js";
 
 // ── Colour — one module: a row that opens a dropdown OKLCH picker. Ported from
@@ -207,7 +207,7 @@ function createPickerBody(meta, onChange) {
     if (mode === "hex") {
       channels.classList.add("tw-color-channels--hex");
       const wrap = el("div", "tw-color-chan");
-      const inp = el("input", "tw-color-chan-input"); inp.type = "text"; inp.spellcheck = false; inp.setAttribute("aria-label", "Hex color");
+      const inp = el("input", "tw-color-chan-input"); inp.type = "text"; inp.spellcheck = false; inp.setAttribute("aria-label", "Hex color"); quietFocus(inp);
       inp.addEventListener("change", () => { const v = inp.value.trim(); if (/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) { [L, C, H, A] = parseColor(v); sync(true); emit(); } });
       inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
       wrap.append(txt("span", "tw-color-chan-label", "HEX"), inp); channels.append(wrap);
