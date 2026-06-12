@@ -1,7 +1,6 @@
 {
   "name": "tweakability",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "description": "A dependency-free, code-split real-time parameter panel — sliders, toggles, a wide-gamut OKLCH colour picker, curve editors and more, from a plain schema.",
   "license": "MIT",
@@ -48,7 +47,6 @@
     "dist/tweaks.js",
     "dist/tweaks.css",
     "dist/types",
-    "src",
     "THIRD-PARTY-NOTICES.md"
   ],
   "devDependencies": {
