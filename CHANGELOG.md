@@ -34,6 +34,13 @@
   fields' ring fired on plain mouse clicks. A one-page modality note (`quietFocus`)
   keeps pointer-origin focus quiet; Tab still rings, and the ring is now rounded
   on the borderless fields instead of a sharp rectangle.
+- The reset arrow no longer spins twice per press. Its settle step renormalises
+  the accumulated rotation to 0 behind a `transition: none` guard, but the guard
+  was committed with `void svg.offsetWidth` — and SVG elements have no
+  `offsetWidth`, so nothing flushed, the browser never saw the suppressed
+  transition, and the −360° → 0 cleanup animated as a full visible unwind right
+  after every spin. The flush is now `getBoundingClientRect()`, which works on
+  SVG; a second click mid-spin still rolls into the next turn.
 
 ### Added
 - Test suite (`npm test`, Node's built-in runner): wide-gamut conversion round-trips,

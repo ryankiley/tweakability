@@ -645,7 +645,14 @@ const spinReset = (btn) => {
       clearTimeout(btn._t);
       btn.classList.remove("is-spinning");
       svg.style.transition = "none"; svg.style.setProperty("--tw-spin", "0deg");
-      void svg.offsetWidth; svg.style.transition = "";
+      // Commit the zero while transitions are off — getBoundingClientRect, NOT offsetWidth:
+      // svg is an SVG element, where offsetWidth is undefined, so the HTML reflow idiom
+      // flushed nothing and the whole inline dance collapsed into one style update. The
+      // browser never saw transition:none, and the −n·360° → 0 change animated through
+      // the restored transition — a full visible unwind right after every spin (the icon
+      // "ran twice" per press).
+      void svg.getBoundingClientRect();
+      svg.style.transition = "";
     };
     svg.addEventListener("transitionend", (e) => {
       if (e.propertyName === "transform" && btn.classList.contains("is-spinning") && performance.now() - btn._spinT > 250) btn._spinSettle();
