@@ -91,6 +91,18 @@ test("destroy() inerts the API and removes the panel", () => {
   assert.equal(p.params.a, 1);
 });
 
+test("monitor: a negative `rows` doesn't spin the buffer trim into an infinite loop", async () => {
+  // Regression: `while (lines.length > rows)` with rows < 0 never terminates (length
+  // floors at 0, still > the negative bound) — a frozen tab on the first poll tick.
+  const p = tweaks("M", { m: { type: "monitor", rows: -5, get: () => "tick", interval: 30 } });
+  document.body.append(p.el);
+  await new Promise((r) => setTimeout(r, 100)); // several poll ticks at the 30ms floor
+  const buf = p.el.querySelector(".tw-monitor-buffer");
+  assert.ok(buf, "buffer rendered");
+  assert.ok(buf.textContent.split("\n").length <= 2, "buffer stayed bounded under a negative rows");
+  p.destroy();
+});
+
 test("text-field focus is quiet after a pointer press, ringed after a key press", () => {
   const p = tweaks("F", { note: "hello" });
   document.body.append(p.el);

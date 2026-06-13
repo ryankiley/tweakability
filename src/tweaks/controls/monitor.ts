@@ -66,10 +66,13 @@ function createMonitor(meta) {
   // String buffer (multiline) — the last `rows` values, newest at the bottom.
   if (!graph && meta.rows) {
     val.remove();
-    const buf = el("pre", "tw-monitor-buffer"); buf.style.setProperty("--tw-monitor-rows", meta.rows);
+    // Sanitise rows like `interval` above: a negative/NaN value spun the trim loop
+    // forever (length floors at 0, still > a negative bound) — a hung tab on first poll.
+    const rows = Math.max(1, Math.floor(+meta.rows) || 1);
+    const buf = el("pre", "tw-monitor-buffer"); buf.style.setProperty("--tw-monitor-rows", rows);
     wrap.append(buf);
     const lines = [];
-    poll((v) => { lines.push(fmt(v)); while (lines.length > meta.rows) lines.shift(); buf.textContent = lines.join("\n"); });
+    poll((v) => { lines.push(fmt(v)); while (lines.length > rows) lines.shift(); buf.textContent = lines.join("\n"); });
     return blade(wrap);
   }
   // Plain readout — just the latest value, refreshed on the interval.
