@@ -83,10 +83,12 @@ function createGradient(meta, onChange) {
         // field while the old stop is still selected, so its commit lands there.
         onDown: (e) => { e.preventDefault(); e.stopPropagation(); h.focus({ focusVisible: false }); select(s, false); offBar = false; }, // focus for keyboard + to commit a dirty channel field, but no keyboard ring on a mouse press; Tab still rings
         onMove: (e) => {
-          s.pos = posFromX(e.clientX); h.style.left = s.pos * 100 + "%"; paint(); emit();
+          // One rail rect for both the X position and the off-bar Y test, so the move
+          // doesn't force a second layout read; the X math is posFromX inlined verbatim.
+          const r = rail.getBoundingClientRect();
+          s.pos = clamp((e.clientX - r.left) / (r.width || 1), 0, 1); h.style.left = s.pos * 100 + "%"; paint(); emit();
           // Drag a stop clear of the bar (past ~24px above/below) to remove it — the
           // touch-friendly removal path; floored at two stops. The stop fades as a cue.
-          const r = rail.getBoundingClientRect();
           offBar = stops.length > 2 && (e.clientY < r.top - 24 || e.clientY > r.bottom + 24);
           h.dataset.removing = String(offBar);
         },

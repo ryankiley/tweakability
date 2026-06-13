@@ -1,7 +1,7 @@
 // ── Colour — wide-gamut OKLCH picker. Lazy: dynamic-imported on first use, and
 // the only module that loads wide-gamut.js (so basic panels never pay for it).
-import { el, txt, clamp, dragGesture, boxFrac, numField, popover, triggerRow, quietFocus, registerControl } from "../shared.js";
-import { oklchGamutProbe, chromaCeil, hexByte, oklchToHex, hexToOklch, channelValues, withChannel, gamutLabel, showsGamutBoundary, readout, serialize, EDIT_MODES, MODE_LABELS, MODE_CHANNELS, convert, num } from "../../wide-gamut.js";
+import { el, txt, clamp, grabSurface, boxFrac, numField, popover, triggerRow, quietFocus, registerControl } from "../shared.js";
+import { oklchGamutProbe, chromaCeil, hexByte, oklchToHex, hexToOklch, channelValues, withChannel, gamutLabel, showsGamutBoundary, readout, serialize, EDIT_MODES, MODE_LABELS, MODE_CHANNELS, convert, oklchToRgbFn, num } from "../../wide-gamut.js";
 
 // ── Colour — one module: a row that opens a dropdown OKLCH picker. Ported from
 // Ryan's tweakpane-plugin-wide-gamut (the real engine; see wide-gamut.js): an
@@ -87,6 +87,7 @@ function parseColor(str) {
 function createPickerBody(meta, onChange) {
   let [L, C, H, A] = parseColor(meta.value || "#7c5cff");
   let mode = "oklch", paintedHue = NaN, chromaCurve = null, chanFields = [];
+  let hueRingH = NaN, hueRingBg = ""; // the hue-thumb ring colour depends only on H — cache it across L/C/A-only moves
   // Emitted value: mode-faithful at display precision, alpha appended in-mode (the
   // engine's serialize — one form for opaque and translucent, round-trips through parse).
   const colorStr = () => serialize([L, C, H], mode, A);
@@ -126,7 +127,11 @@ function createPickerBody(meta, onChange) {
     if (off.width !== W || off.height !== Hh) { off.width = W; off.height = Hh; offData = new ImageData(W, Hh, CANVAS_CS); }
     const data = offData.data;
     const invH = Hh > 1 ? 1 / (Hh - 1) : 0, invW = W > 1 ? 1 / (W - 1) : 0;
-    for (let y = 0; y < Hh; y++) { const Lp = 1 - y * invH, rowMax = sampleCurve(curve, Lp); for (let x = 0; x < W; x++) { const rgb = convert([Lp, x * invW * rowMax, H], "oklch", ENGINE_GAMUT); const o = (y * W + x) * 4; data[o] = Math.round(clamp(rgb[0], 0, 1) * 255); data[o + 1] = Math.round(clamp(rgb[1], 0, 1) * 255); data[o + 2] = Math.round(clamp(rgb[2], 0, 1) * 255); data[o + 3] = 255; } }
+    // H is constant for the whole raster, so fold the oklch→RGB chain (cos/sin of H + the
+    // LMS→XYZ→RGB matrices) once and write each pixel into a reused 3-array — instead of a
+    // per-pixel convert() that re-trigged H and allocated a fresh array every pixel.
+    const toRgb = oklchToRgbFn(H, ENGINE_GAMUT), rgb = [0, 0, 0];
+    for (let y = 0; y < Hh; y++) { const Lp = 1 - y * invH, rowMax = sampleCurve(curve, Lp); for (let x = 0; x < W; x++) { toRgb(Lp, x * invW * rowMax, rgb); const o = (y * W + x) * 4; data[o] = Math.round(clamp(rgb[0], 0, 1) * 255); data[o + 1] = Math.round(clamp(rgb[1], 0, 1) * 255); data[o + 2] = Math.round(clamp(rgb[2], 0, 1) * 255); data[o + 3] = 255; } }
     octx.putImageData(offData, 0, 0);
     areaCanvas.width = backingW; areaCanvas.height = backingH; actx.imageSmoothingEnabled = true; actx.drawImage(off, 0, 0, backingW, backingH);
     // Gamut boundaries on the dpr-backed canvas → crisp: solid sRGB line inside,
@@ -183,8 +188,11 @@ function createPickerBody(meta, onChange) {
     // full-vibrancy hue at this H, matched to the strip raster so the fill is seamless.
     areaThumb.style.background = `oklch(${L} ${C} ${H})`;
     alphaThumb.style.background = `linear-gradient(oklch(${L} ${C} ${H} / ${A}), oklch(${L} ${C} ${H} / ${A})), var(--tw-dropdown-bg)`;
-    const hueRgb = convert([STRIP_L, chromaCeil(oklchGamutProbe(H, "srgb"), STRIP_L), H], "oklch", "srgb");
-    hueThumb.style.background = `rgb(${clamp(hueRgb[0] * 255, 0, 255) | 0} ${clamp(hueRgb[1] * 255, 0, 255) | 0} ${clamp(hueRgb[2] * 255, 0, 255) | 0})`;
+    if (H !== hueRingH) { // ring depends only on H (STRIP_L is const) — skip the probe + bisect + convert when only L/C/A moved
+      const hueRgb = convert([STRIP_L, chromaCeil(oklchGamutProbe(H, "srgb"), STRIP_L), H], "oklch", "srgb");
+      hueRingBg = `rgb(${clamp(hueRgb[0] * 255, 0, 255) | 0} ${clamp(hueRgb[1] * 255, 0, 255) | 0} ${clamp(hueRgb[2] * 255, 0, 255) | 0})`; hueRingH = H;
+    }
+    hueThumb.style.background = hueRingBg;
   };
   const refresh = () => {
     gamut2.textContent = gamutLabel([L, C, H], mode); // gamut shows in the picker only
@@ -219,22 +227,17 @@ function createPickerBody(meta, onChange) {
     refresh();
   };
 
-  // Grab feedback: the surface flags .is-grabbing for its run so the thumb scales up
+  // Grab feedback: grabSurface flags .is-grabbing for the drag's run so the thumb scales up
   // (CSS, spring-eased) the moment you press — the picker's echo of the slider handle's lift.
-  const grabbable = (surface, set) => dragGesture(surface, {
-    onDown: (e) => { surface.classList.add("is-grabbing"); set(e); },
-    onMove: set,
-    onEnd: () => surface.classList.remove("is-grabbing"),
-  });
   const areaXY = (e) => boxFrac(e, area);
   const setArea = (e) => { const [fx, fy] = areaXY(e); L = 1 - fy; C = fx * (chromaCurve ? sampleCurve(chromaCurve, L) : 0.4); positionThumbs(); refresh(); emit(); };
-  grabbable(area, setArea);
+  grabSurface(area, setArea);
   const hueAt = (e) => boxFrac(e, hueBar)[0] * 360;
   const setHue = (e) => { H = hueAt(e); sync(true); emit(); };
-  grabbable(hueBar, setHue);
+  grabSurface(hueBar, setHue);
   const alphaAt = (e) => boxFrac(e, alphaBar)[0];
   const setAlpha = (e) => { A = alphaAt(e); positionThumbs(); refresh(); emit(); };
-  grabbable(alphaBar, setAlpha);
+  grabSurface(alphaBar, setAlpha);
   alphaBar.addEventListener("keydown", (e) => {
     const d = e.shiftKey ? 0.1 : 0.01;
     let nv = A;

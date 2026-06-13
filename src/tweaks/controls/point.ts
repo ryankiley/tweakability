@@ -1,5 +1,5 @@
 // ── Point — 2D/3D/4D vector. Lazy.
-import { el, svgEl, numField, dragGesture, boxFrac, clamp, stepPrecision, popover, triggerRow, registerControl } from "../shared.js";
+import { el, svgEl, numField, grabSurface, boxFrac, clamp, stepPrecision, popover, triggerRow, registerControl } from "../shared.js";
 
 // ── Point — a compact trigger row (label + value readout + a mini pad preview) that
 // opens the 2D pad over the component number fields in a portaled popover, the way the
@@ -37,6 +37,8 @@ function createPoint(meta, onChange) {
     // as a vector (magnitude + angle). The pad is square so the angle is true.
     const padSvg = svgEl("svg", "tw-pad-line"); padSvg.setAttribute("viewBox", "0 0 100 100"); padSvg.setAttribute("preserveAspectRatio", "none");
     padLine = svgEl("line"); padSvg.append(padLine);
+    // The tether origin (where 0,0 maps) is fixed for the control's life — set x1/y1 once.
+    const oy0 = frac(0, minY, maxY); padLine.setAttribute("x1", frac(0, minX, maxX) * 100); padLine.setAttribute("y1", (meta.invertY ? oy0 : 1 - oy0) * 100);
     padHost.append(el("div", "tw-pad-axis tw-pad-axis-x"), el("div", "tw-pad-axis tw-pad-axis-y"), padSvg, padThumb);
     body.append(padHost);
   }
@@ -71,8 +73,7 @@ function createPoint(meta, onChange) {
       const tx = fx * 100, ty = tyFrac * 100;
       padThumb.style.left = tx + "%"; padThumb.style.top = ty + "%";
       previewDot.style.left = inset(fx); previewDot.style.top = inset(tyFrac); // mini pad: dot stays in bounds
-      const ox = frac(0, minX, maxX) * 100, oyv = frac(0, minY, maxY), oy = (meta.invertY ? oyv : 1 - oyv) * 100;
-      padLine.setAttribute("x1", ox); padLine.setAttribute("y1", oy); padLine.setAttribute("x2", tx); padLine.setAttribute("y2", ty);
+      padLine.setAttribute("x2", tx); padLine.setAttribute("y2", ty); // origin (x1,y1) is fixed — set once at setup
     };
     const padSet = (e) => {
       const [fx, fy] = boxFrac(e, padHost); const yFrac = meta.invertY ? fy : 1 - fy;
@@ -80,11 +81,7 @@ function createPoint(meta, onChange) {
       sync(); emit();
     };
     // .is-grabbing scales the thumb on press (CSS, spring) — the pad's echo of the slider lift.
-    dragGesture(padHost, {
-      onDown: (e) => { padHost.classList.add("is-grabbing"); padSet(e); },
-      onMove: padSet,
-      onEnd: () => padHost.classList.remove("is-grabbing"),
-    });
+    grabSurface(padHost, padSet);
   }
 
   root.append(pop);

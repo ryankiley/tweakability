@@ -15,7 +15,7 @@
 import {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, btn, txt, popover, placeBelow, closeActivePopover, stopPointerLeak, applyThemeVars, resolveTheme, carryScheme, carrySkin, onReady, onLive,
-  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, numField, blade, quietFocus, stretchPill, REDUCE_MOTION,
+  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, numField, blade, quietFocus, measurePill, REDUCE_MOTION,
   registerControl, getControl,
 } from "./shared.js";
 import type { Schema, TweaksOptions, Panel, Params } from "./types.js";
@@ -236,9 +236,10 @@ function createSlider(meta, onChange) {
     const edge = `${pct}%${off}`;
     fill.style.width = pull ? `calc(${edge})` : pct + "%";
     handle.style.left = `max(5px, calc(${edge} - 9px))`; // the inset hairline rides just inside the fill edge
-    valueEl.textContent = q(value).toFixed(decimals);
-    track.setAttribute("aria-valuenow", String(q(value)));
-    track.setAttribute("aria-valuetext", q(value).toFixed(decimals));
+    const qv = q(value), qvText = qv.toFixed(decimals); // q(value) is pure — compute once (render() runs every drag frame)
+    valueEl.textContent = qvText;
+    track.setAttribute("aria-valuenow", String(qv));
+    track.setAttribute("aria-valuetext", qvText);
     // Value-dodge: the handle yields only when it actually overlaps the
     // label (left) or value (right) text — comparing the handle's real pixel span
     // (it renders at pct% − 9px, 3px wide) against each text's measured edge, so it
@@ -416,16 +417,10 @@ function createSegmented(options, value, onChange, ariaLabel) {
   const pill = el("div", "tw-seg-pill");
   seg.append(pill);
   const btns = options.map((o) => { const b = radioButton("tw-seg-btn", o, (v) => set(v)); seg.append(b); return b; }); // lazy `set` — it's declared below
-  const measure = (animate?) => {
-    const active = seg.querySelector('[data-active="true"]');
-    if (!active) return;
-    const left = active.offsetLeft, width = active.offsetWidth, prev = parseFloat(pill.style.left);
-    pill.style.left = left + "px"; pill.style.width = width + "px"; // fill the active segment; the 2px flex gap + 2px container padding frame it (same as tabs)
-    // Liquid pill: as it slides between segments, a transient scaleX overshoot makes the
-    // leading edge stretch ahead then pull in — the kind of finesse the slider's glide has.
-    // Origin is the trailing edge so the stretch reads directional. Reduced-motion skips it.
-    if (animate && Number.isFinite(prev) && prev !== left) stretchPill(pill, left > prev ? 1 : -1);
-  };
+  // Fill the active segment; the 2px flex gap + 2px container padding frame it. The liquid
+  // pill (a transient scaleX overshoot, trailing-edge origin) rides on a real move — shared
+  // with tabs via measurePill (reduced-motion skips the stretch).
+  const measure = (animate?) => measurePill(seg, pill, animate);
   const reflect = () => { setRadioActive(btns, value); measure(true); };
   const set = (v, fire = true) => { value = v; reflect(); if (fire) onChange(v); };
   seg.addEventListener("keydown", (e) => {
