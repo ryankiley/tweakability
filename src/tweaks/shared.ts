@@ -57,7 +57,9 @@ const txt = (tag: string, cls: string, text: any): any => { const n = el(tag, cl
 // A resolved custom property off a node; accentColor picks the panel accent and
 // falls back to the primary text colour then white (canvas strokes need a literal).
 const cssVar = (node, name) => getComputedStyle(node).getPropertyValue(name).trim();
-const accentColor = (node) => cssVar(node, "--tw-accent") || cssVar(node, "--tw-text-primary") || "#fff";
+// Resolve the computed style once and read both custom props off it — cssVar would call
+// getComputedStyle a second time on the fallback, and accentColor runs in the FPS draw loop.
+const accentColor = (node) => { const r = getComputedStyle(node); const v = (n) => r.getPropertyValue(n).trim(); return v("--tw-accent") || v("--tw-text-primary") || "#fff"; };
 // Stop a node's pointer events leaking to the page behind it (the panel + the
 // popovers portaled to <body>, which sit outside the panel's own pointer-stop).
 const stopPointerLeak = (node) => ["pointerdown", "pointermove", "pointerup"].forEach((t) => node.addEventListener(t, (e) => e.stopPropagation()));
@@ -110,6 +112,14 @@ function dragGesture(node: any, { onDown, onMove, onEnd }: { onDown?: (e: any) =
   node.addEventListener("pointerup", end); node.addEventListener("pointercancel", end);
   node.addEventListener("lostpointercapture", end); // implicit capture loss (the popover unmounting mid-drag) ends the gesture too, so grab state can't strand
 }
+// Press-drag that flags .is-grabbing on the surface for the gesture's run (the thumb-lift
+// CSS keys off it) — the colour plane/strips and the point pad share this exact shape.
+// (Spring/bezier keep their own dragGesture: they use .is-dragging and capture a rect on down.)
+const grabSurface = (surface, set) => dragGesture(surface, {
+  onDown: (e) => { surface.classList.add("is-grabbing"); set(e); },
+  onMove: set,
+  onEnd: () => surface.classList.remove("is-grabbing"),
+});
 // Pointer position inside a box as [x, y] fractions in 0–1 — read off the box's own
 // rect (the colour plane/strips and the point pad).
 const boxFrac = (e, box) => { const r = box.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1)]; };
@@ -314,6 +324,15 @@ const stretchPill = (pill, dir) => {
   pill.style.transformOrigin = dir > 0 ? "left center" : "right center";
   pill.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(1.18)" }, { transform: "scaleX(1)" }], { duration: 300, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
 };
+// Slide a pill to the active child of `container` — the segmented control + tabs share
+// this. Batch the three box reads before either write (so a measure can't force an extra
+// layout flush), then run the liquid stretch on a real move (animate + position changed).
+const measurePill = (container, pill, animate?) => {
+  const a = container.querySelector('[data-active="true"]'); if (!a) return;
+  const left = a.offsetLeft, width = a.offsetWidth, prev = parseFloat(pill.style.left);
+  pill.style.left = left + "px"; pill.style.width = width + "px";
+  if (animate && Number.isFinite(prev) && prev !== left) stretchPill(pill, left > prev ? 1 : -1);
+};
 
 // Reflect a single-select value onto a radio group's buttons: data-active (paint),
 // aria-checked (semantics), and a roving tabindex so Tab lands on the selected one
@@ -444,6 +463,6 @@ export {
   optValue, optLabel, el, btn, txt, svgEl, cssVar, accentColor, stopPointerLeak, onReady, onLive,
   wireHoverClass, dragGesture, boxFrac, fitCanvas, popover, closeActivePopover,
   resolveTheme, applyThemeVars, carryScheme, carrySkin, fuzzyMatch, setRadioActive, radioButton, navIndex, triggerRow,
-  numField, blade, quietFocus, stretchPill, REDUCE_MOTION,
+  numField, blade, quietFocus, stretchPill, measurePill, grabSurface, REDUCE_MOTION,
 };
 

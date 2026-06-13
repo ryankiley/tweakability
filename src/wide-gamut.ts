@@ -161,6 +161,25 @@ export function oklchGamutProbe(hue, gamut) {
     const b = gam(F[2][0] * c0 + F[2][1] * c1 + F[2][2] * c2); return b >= lo && b <= hi;
   };
 }
+/** OKLCH→RGB at a fixed hue, folded for per-pixel rasterising: hoists cos/sin(hue) and
+ * collapses LMS→XYZ→RGB into one matrix once, then `(L, C, out)` writes the RGB straight
+ * into `out` (no per-pixel array alloc, no per-pixel trig). Algebraically identical to
+ * `convert([L,C,hue], "oklch", gamut)` — OKLAB_TO_LMS[i][0] is 1, so p_i = L + C·d_i, the
+ * same fold `oklchGamutProbe` ships. The picker's plane raster calls it once per repaint. */
+export function oklchToRgbFn(hue, gamut) {
+  const h = hue * RAD, cos = Math.cos(h), sin = Math.sin(h);
+  const d0 = cos * OKLAB_TO_LMS[0][1] + sin * OKLAB_TO_LMS[0][2];
+  const d1 = cos * OKLAB_TO_LMS[1][1] + sin * OKLAB_TO_LMS[1][2];
+  const d2 = cos * OKLAB_TO_LMS[2][1] + sin * OKLAB_TO_LMS[2][2];
+  const F = mulMat(gamut === "p3" ? XYZ_TO_LIN_P3 : gamut === "rec2020" ? XYZ_TO_LIN_REC2020 : XYZ_TO_LIN_SRGB, LMS_TO_XYZ);
+  const gam = gamut === "rec2020" ? rec2020Gam : srgbGam;
+  return (L, C, out) => {
+    const p0 = L + C * d0, p1 = L + C * d1, p2 = L + C * d2, c0 = p0 ** 3, c1 = p1 ** 3, c2 = p2 ** 3;
+    out[0] = gam(F[0][0] * c0 + F[0][1] * c1 + F[0][2] * c2);
+    out[1] = gam(F[1][0] * c0 + F[1][1] * c1 + F[1][2] * c2);
+    out[2] = gam(F[2][0] * c0 + F[2][1] * c1 + F[2][2] * c2);
+  };
+}
 /** Bisect the chroma ceiling at lightness L for an `oklchGamutProbe` — the highest
  * in-gamut C. The picker traces its plane gamut, boundary lines, and hue strip with it. */
 export function chromaCeil(probe, L, hi = 0.5) {

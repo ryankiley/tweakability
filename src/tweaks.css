@@ -640,7 +640,7 @@
 .tw-color-channels--hex { grid-template-columns: 1fr; }
 .tw-color-chan { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .tw-color-chan-label { font-size: 10px; font-weight: 600; letter-spacing: 0.03em; color: var(--tw-text-tertiary); text-transform: uppercase; }
-.tw-color-chan-input { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; font-size: 12px; font-weight: 500; font-family: var(--tw-font-sans); color: var(--tw-text-label); background: var(--tw-surface); border: 1px solid var(--tw-border); border-radius: calc(var(--tw-radius) - 2px); padding: 5px 6px; outline: none; text-transform: uppercase; }
+.tw-color-chan-input { width: 100%; min-width: 0; font: inherit; font-size: 12px; font-weight: 500; font-family: var(--tw-font-sans); color: var(--tw-text-label); background: var(--tw-surface); border: 1px solid var(--tw-border); border-radius: calc(var(--tw-radius) - 2px); padding: 5px 6px; outline: none; text-transform: uppercase; }
 .tw-color-chan-input:focus { color: var(--tw-text-focus); border-color: var(--tw-border-hover); }
 
 /* the picker plane + hue strip (inside the dropdown) */
@@ -705,7 +705,7 @@
 .tw-text::placeholder { color: var(--tw-text-tertiary); }
 /* Multiline string (textarea) — the row grows to fit; label sits at the top-left. */
 .tw-row-multiline { flex-direction: column; align-items: stretch; height: auto; gap: 4px; padding: 6px 10px 6px 12px; } /* match the single-row content box (12 L / 10 R) so the label + textarea align with every other row */
-.tw-textarea { flex: none; width: 100%; box-sizing: border-box; resize: vertical; min-height: 3em; padding: 0; line-height: 1.45; text-align: left; font-family: var(--tw-font-sans); }
+.tw-textarea { flex: none; width: 100%; resize: vertical; min-height: 3em; padding: 0; line-height: 1.45; text-align: left; font-family: var(--tw-font-sans); }
 
 /* ── Image — a drop-zone with a thumbnail ── */
 .tw-image-input { display: none; }
