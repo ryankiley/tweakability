@@ -40,12 +40,16 @@
       "types": "./dist/types/tweaks/core.d.ts",
       "import": "./dist/tweaks/core.js"
     },
-    "./css": "./dist/tweaks.css"
+    "./css": {
+      "types": "./dist/tweaks.css.d.ts",
+      "default": "./dist/tweaks.css"
+    }
   },
   "files": [
     "dist/tweaks",
     "dist/tweaks.js",
     "dist/tweaks.css",
+    "dist/tweaks.css.d.ts",
     "dist/types",
     "THIRD-PARTY-NOTICES.md"
   ],

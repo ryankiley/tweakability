@@ -79,6 +79,14 @@ await esbuild.build({
   }
   const { code } = await esbuild.transform(css, { minify: true, loader: "css" });
   await writeFile(p("dist/tweaks.css"), code);
+  // A side-effect type declaration for the `./css` subpath export so a TS
+  // consumer can `import "tweakit/css"` without TS2307 — a bare package-subpath
+  // import isn't matched by a global `*.css` ambient. The file itself is CSS;
+  // this just lets TypeScript resolve the module.
+  await writeFile(
+    p("dist/tweaks.css.d.ts"),
+    '// tweakit/css — the panel stylesheet, imported for its side effect:\n//   import "tweakit/css";\nexport {};\n'
+  );
 }
 
 // 4) .d.ts declarations → dist/types/ (consumer types; tsc, declaration-only)
