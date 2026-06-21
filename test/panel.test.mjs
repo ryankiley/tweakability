@@ -103,6 +103,118 @@ test("monitor: a negative `rows` doesn't spin the buffer trim into an infinite l
   p.destroy();
 });
 
+test("setMany applies a batch across folders and notifies once", () => {
+  const p = tweaks("SM", { a: [1, 0, 10, 1], b: [1, 0, 10, 1], folder: { c: [1, 0, 10, 1] } });
+  let calls = 0, lastKey;
+  p.on((params, last) => { calls++; lastKey = last; });
+  p.setMany({ a: 5, b: 7, "folder.c": 9 });
+  assert.equal(p.params.a, 5);
+  assert.equal(p.params.b, 7);
+  assert.equal(p.params.folder.c, 9);
+  assert.equal(calls, 1);          // one notification for the whole batch, not one per key
+  assert.equal(lastKey, "c");      // _last reflects the final applied key
+});
+
+test("setMany skips reserved + no-op keys but applies the rest, still notifying once", () => {
+  const p = tweaks("SM2", { a: [1, 0, 10, 1], b: [1, 0, 10, 1] });
+  let calls = 0;
+  p.on(() => calls++);
+  p.setMany({ a: 1, b: 4, "__proto__.x": true }); // a unchanged, proto refused, b changes
+  assert.equal({}.x, undefined);
+  assert.equal(p.params.a, 1);
+  assert.equal(p.params.b, 4);
+  assert.equal(calls, 1);
+});
+
+test("setMany with no effective change does not notify (the batch echo guard)", () => {
+  const p = tweaks("SM3", { a: [1, 0, 10, 1] });
+  let calls = 0;
+  p.on(() => calls++);
+  p.setMany({ a: 1 });
+  assert.equal(calls, 0);
+});
+
+test("spring defaults to physics mode and emits stiffness/damping/mass only", () => {
+  const p = tweaks("Sp", { s: { type: "spring", value: { stiffness: 120, damping: 14, mass: 1 } } });
+  assert.deepEqual(p.params.s, { stiffness: 120, damping: 14, mass: 1 });
+});
+
+test("spring time mode maps duration/bounce to physics and carries both through", () => {
+  const p = tweaks("Sp2", { s: { type: "spring", visualDuration: 0.5, bounce: 0.2 } });
+  const v = p.params.s;
+  assert.equal(v.visualDuration, 0.5);
+  assert.equal(v.bounce, 0.2);
+  const k = (2 * Math.PI / 0.5) ** 2;                       // perceptual mapping
+  assert.ok(Math.abs(v.stiffness - k) < 1e-6);             // resolved physics for runtime-agnostic consumers
+  assert.ok(Math.abs(v.damping - 2 * (1 - 0.2) * Math.sqrt(k)) < 1e-6);
+  assert.equal(v.mass, 1);
+});
+
+test("spring set() flips mode by the keys it receives", () => {
+  const p = tweaks("Sp3", { s: { type: "spring", value: { stiffness: 100, damping: 12, mass: 1 } } });
+  p.set("s", { visualDuration: 0.4, bounce: 0.1 });         // physics → time
+  assert.equal(p.params.s.visualDuration, 0.4);
+  assert.equal(p.params.s.bounce, 0.1);
+  p.set("s", { stiffness: 200, damping: 20, mass: 2 });     // time → physics
+  assert.deepEqual(p.params.s, { stiffness: 200, damping: 20, mass: 2 });
+  assert.ok(!("visualDuration" in p.params.s));            // clean physics value, no authoring keys
+});
+
+test("spring set() with both key groups restores the physics cache for a later toggle", () => {
+  const p = tweaks("Sp", { s: { type: "spring", value: { stiffness: 100, damping: 12, mass: 1 } } });
+  document.body.append(p.el);
+  // a time-mode value that ALSO carries physics keys (as reset's default does) — time wins
+  // for the active value, but the physics cache must be restored too.
+  p.set("s", { visualDuration: 0.5, bounce: 0.2, stiffness: 250, damping: 22, mass: 2 });
+  assert.equal(p.params.s.visualDuration, 0.5);   // active = time
+  const physBtn = [...p.el.querySelectorAll(".tw-spring .tw-seg-btn")].find((b) => b.textContent.trim() === "Physics");
+  physBtn.click();                                  // toggle to Physics
+  assert.deepEqual(p.params.s, { stiffness: 250, damping: 22, mass: 2 }); // restored, not stale {100,12,1}
+  p.destroy();
+});
+
+test("toJSON captures values + folder/tab UI; fromJSON restores them; JSON.stringify uses it", () => {
+  const p = tweaks("State", {
+    blur: [10, 0, 100, 1],
+    shadow: { radius: [4, 0, 20, 1] },
+    pages: { type: "tabs", pages: { First: { x: [1, 0, 10, 1] }, Second: { y: [2, 0, 10, 1] } } },
+  });
+  document.body.append(p.el);
+  const tabBtns = () => [...p.el.querySelectorAll(".tw-tabs-tab")];
+  p.set("blur", 42);
+  p.el.querySelector(".tw-folder-header").click();                       // collapse the shadow folder
+  tabBtns().find((t) => t.textContent.trim() === "Second").click();      // activate page "Second" (key "second")
+
+  const state = p.toJSON();
+  assert.equal(state.values.blur, 42);
+  assert.equal(state.values.shadow.radius, 4);
+  assert.equal(state.ui.folders["shadow"], true);
+  assert.equal(state.ui.tabs["pages"], "second");
+  assert.equal(JSON.parse(JSON.stringify(p)).values.blur, 42);          // the standard toJSON hook fires through stringify
+
+  // drift away from the saved state, then restore
+  p.set("blur", 0);
+  p.el.querySelector(".tw-folder-header").click();                       // expand
+  tabBtns().find((t) => t.textContent.trim() === "First").click();
+  assert.ok(!p.el.querySelector(".tw-folder").classList.contains("is-collapsed"));
+
+  p.fromJSON(state);
+  assert.equal(p.params.blur, 42);
+  assert.ok(p.el.querySelector(".tw-folder").classList.contains("is-collapsed"));
+  assert.equal(tabBtns().find((t) => t.dataset.active === "true").textContent.trim(), "Second");
+  p.destroy();
+});
+
+test("fromJSON applies known value paths, skips stale ones, and notifies once", () => {
+  const p = tweaks("State2", { a: [1, 0, 10, 1], b: [1, 0, 10, 1] });
+  let calls = 0;
+  p.on(() => calls++);
+  p.fromJSON({ values: { a: 5, gone: 9 } });   // 'gone' matches no control
+  assert.equal(p.params.a, 5);
+  assert.equal(p.params.b, 1);                 // untouched (skip-missing)
+  assert.equal(calls, 1);                      // one notification for the whole restore
+});
+
 test("text-field focus is quiet after a pointer press, ringed after a key press", () => {
   const p = tweaks("F", { note: "hello" });
   document.body.append(p.el);

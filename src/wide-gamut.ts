@@ -1,6 +1,6 @@
 /* Wide-gamut colour engine + mode model — the maths backbone for the Tweaks
  * OKLCH colour picker. Ported directly (not from memory) from Ryan's
- * tweakpane-plugin-wide-gamut: core/convert.ts (every space, CSS Color 4
+ * wide-gamut colour plugin: core/convert.ts (every space, CSS Color 4
  * reference matrices, hub through CIE XYZ), core/gamut.ts (in-gamut + the
  * CSS Color 4 chroma-reduction map), and the channel/mode model from
  * model/color.ts. Pure functions, zero dependencies. */

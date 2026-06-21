@@ -4,11 +4,11 @@ import { el, txt, clamp, grabSurface, boxFrac, numField, popover, triggerRow, qu
 import { oklchGamutProbe, chromaCeil, hexByte, oklchToHex, hexToOklch, channelValues, withChannel, gamutLabel, showsGamutBoundary, readout, serialize, EDIT_MODES, MODE_LABELS, MODE_CHANNELS, convert, oklchToRgbFn, num } from "../../wide-gamut.js";
 
 // ── Colour — one module: a row that opens a dropdown OKLCH picker. Ported from
-// Ryan's tweakpane-plugin-wide-gamut (the real engine; see wide-gamut.js): an
+// Ryan's wide-gamut colour plugin (the real engine; see wide-gamut.js): an
 // L×C plane + hue strip, all 11 colour modes with channel inputs, and the
 // sRGB / P3 / wide gamut label. Canonical working space is OKLCH; the row shows
 // the value in the current mode and opens the picker below.
-// ── Colour-area rendering, ported from tweakpane-plugin-wide-gamut (area-compute
+// ── Colour-area rendering, ported from the wide-gamut plugin (area-compute
 // + area-picker). The plane stretches to the P3 gamut and is drawn at device-pixel
 // resolution (crisp boundary lines), in a Display-P3 canvas where supported (wide
 // colours render true, not clamped to muddy sRGB). A solid sRGB line sits inside;
@@ -24,7 +24,7 @@ const CHECKER = "repeating-conic-gradient(#6b6b6b 0% 25%, #9a9a9a 0% 50%) 0 0 / 
 
 // Parse any CSS colour (hex / oklch / oklab / lab / lch / color() / rgb / hsl / named) → [L, C, H, alpha].
 // The CSS Color 4 functions are parsed by regex + the engine — channel handling ported
-// from the wide-gamut plugin's parser (tweakpane-plugin-wide-gamut core/parse.ts):
+// from the wide-gamut plugin's parser (core/parse.ts):
 // signs, exponents, `none` (→ 0), real angle units (deg/grad/rad/turn), and per-slot
 // `%` scaling (oklch/oklab C·a·b 100% ↔ 0.4, lab a/b ↔ ±125, lch C ↔ 150). The canvas
 // fallback below is only safe for sRGB-family colours: its fillStyle getter echoes wide

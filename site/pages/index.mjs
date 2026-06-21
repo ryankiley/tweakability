@@ -28,23 +28,30 @@ export const examples = [
     prose: `<p>The panel below is built from the one schema object under it — nothing
       else. Shorthands infer controls from a value's shape (<code>[value, min, max,
       step]</code> → slider, <code>[[lo, hi], …]</code> → interval, <code>true</code> →
-      checkbox, a hex string → the wide-gamut color picker); the <code>{ type }</code>
-      forms opt into everything the shorthands can't say. Scrub the sliders, open the
-      popovers, drag it around by the header.</p>`,
+      checkbox, a hex string → the wide-gamut color picker, a nested object → a
+      collapsible folder); the <code>{ type }</code> forms opt into everything the
+      shorthands can't say. Scrub the sliders, open the popovers, expand the folders,
+      drag it around by the header.</p>`,
     noCaption: true,
     run: ({ tweaks, mount }) => {
       const panel = tweaks("Demo", {
         intensity: [0.65, 0, 1, 0.01],
-        range: [[20, 80], 0, 100, 1],
-        quality: { type: "segmented", options: ["Low", "Med", "High"], value: "Med" },
         accent: "#7C5CFF",
-        origin: { type: "point", pad: true, components: [
-          { key: "x", label: "X", value: 0, min: -1, max: 1, step: 0.01 },
-          { key: "y", label: "Y", value: 0, min: -1, max: 1, step: 0.01 },
-        ] },
-        motion: { type: "spring", stiffness: 220, damping: 18, mass: 1 },
-        live: true,
-        fps: { type: "fpsgraph", label: "FPS" },
+        shape: {                       // each nested object → a collapsible folder
+          range: [[20, 80], 0, 100, 1],
+          quality: { type: "segmented", options: ["Low", "Med", "High"], value: "Med" },
+          origin: { type: "point", pad: true, components: [
+            { key: "x", label: "X", value: 0, min: -1, max: 1, step: 0.01 },
+            { key: "y", label: "Y", value: 0, min: -1, max: 1, step: 0.01 },
+          ] },
+        },
+        motion: {
+          spring: { type: "spring", stiffness: 220, damping: 18, mass: 1 },
+        },
+        monitor: {
+          live: true,
+          fps: { type: "fpsgraph", label: "FPS" },
+        },
       });
       mount.append(panel.el);
     },

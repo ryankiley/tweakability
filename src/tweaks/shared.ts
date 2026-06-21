@@ -359,6 +359,34 @@ const navIndex = (key, i, n, cols = 0) => {
   }
   return -1;
 };
+// ── Segmented control — a single-select pill row, shared by the boolean Off/On toggle
+// and the spring's Time | Physics mode switch. ──
+function createSegmented(options, value, onChange, ariaLabel) {
+  const seg = el("div", "tw-seg"); seg.setAttribute("role", "radiogroup");
+  if (ariaLabel) seg.setAttribute("aria-label", ariaLabel);
+  const pill = el("div", "tw-seg-pill");
+  seg.append(pill);
+  const btns = options.map((o) => { const b = radioButton("tw-seg-btn", o, (v) => set(v)); seg.append(b); return b; }); // lazy `set` — it's declared below
+  // Fill the active segment; the 2px flex gap + 2px container padding frame it. The liquid
+  // pill (a transient scaleX overshoot, trailing-edge origin) rides on a real move — shared
+  // with tabs via measurePill (reduced-motion skips the stretch).
+  const measure = (animate?) => measurePill(seg, pill, animate);
+  const reflect = () => { setRadioActive(btns, value); measure(true); };
+  const set = (v, fire = true) => { value = v; reflect(); if (fire) onChange(v); };
+  seg.addEventListener("keydown", (e) => {
+    const i = btns.findIndex((b) => b.dataset.value === String(value)); if (i < 0) return;
+    const j = navIndex(e.key, i, btns.length); if (j < 0) return;
+    e.preventDefault(); set(btns[j]._twVal); btns[j].focus(); // _twVal, not dataset.value — the keyboard pick must emit the option's real (possibly non-string) value
+  });
+  reflect();
+  onReady(() => { measure(); seg.classList.add("is-ready"); }); // measure once laid out, again when fonts land (re-adding is-ready is a no-op)
+  // A tab page revealing this control re-measures the pill — built at 0×0 while the page
+  // was display:none, it would otherwise sit stuck at left:0/width:0 until the next edit or
+  // resize (the canvas controls subscribe to the same event). No animate arg → reposition
+  // without the liquid stretch; self-cleans once the panel leaves the DOM.
+  onLive(seg, [[window, "tw-reflow"]], () => measure());
+  return { el: seg, set: (v) => set(v, false), get: () => value };
+}
 // The modal-trigger row shared by the colour, gradient, and point controls: a
 // full-width row button — label left, a preview cluster (`right`) the caller fills —
 // that opens the control's popover. The caller appends its pop and wires popover().
@@ -371,7 +399,7 @@ const triggerRow = (cls: string, label: string) => {
   return { root, trigger, right };
 };
 
-// Tweakpane-style grab guide — a dotted line from the grab point to the cursor
+// Grab guide — a dotted line from the grab point to the cursor
 // plus a floating value bubble, portaled to <body> for the duration of a drag.
 // Shared by createNumber and the numField helper (Spring / Point / Bezier).
 function makeGrabGuide() {
@@ -462,7 +490,7 @@ export {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, btn, txt, svgEl, cssVar, accentColor, stopPointerLeak, onReady, onLive,
   wireHoverClass, dragGesture, boxFrac, fitCanvas, popover, closeActivePopover,
-  resolveTheme, applyThemeVars, carryScheme, carrySkin, fuzzyMatch, setRadioActive, radioButton, navIndex, triggerRow,
+  resolveTheme, applyThemeVars, carryScheme, carrySkin, fuzzyMatch, setRadioActive, radioButton, navIndex, createSegmented, triggerRow,
   numField, blade, quietFocus, measurePill, grabSurface, REDUCE_MOTION,
 };
 

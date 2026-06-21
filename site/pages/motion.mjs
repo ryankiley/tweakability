@@ -15,10 +15,13 @@ export const examples = [
   {
     id: "spring",
     title: "Spring",
-    prose: `<p><code>{ type: "spring" }</code> is a stiffness / damping / mass tuner
-      with a live settle-curve preview. The param is the plain
-      <code>{ stiffness, damping, mass }</code> object — here it drives a tiny integrator.
-      Soften the damping, then send the ball.</p>`,
+    prose: `<p><code>{ type: "spring" }</code> tunes a spring two ways over one live
+      settle-curve preview — a perceptual <strong>Time</strong> mode (duration + bounce) or
+      a <strong>Physics</strong> mode (stiffness / damping / mass), switched in the control.
+      Either way the param resolves to a <code>{ stiffness, damping, mass }</code> object
+      (Time mode carries the authoring <code>visualDuration</code> / <code>bounce</code>
+      alongside it, so it round-trips); here it drives a tiny integrator. Soften the damping,
+      then send the ball.</p>`,
     target: `<div class="spr-track"><div class="spr-ball"></div></div>`,
     css: `
       .spr-track { position: relative; width: 100%; height: 64px; border-radius: 14px;

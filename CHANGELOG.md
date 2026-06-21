@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- The spring control gains a **Time** mode alongside Physics. Physics keeps the
+  stiffness / damping / mass fields; Time exposes a perceptual `visualDuration` + `bounce`
+  pair (Motion's spring shorthand) mapped onto the same settle-curve preview
+  (`stiffness = (2π/visualDuration)²`, `ζ = 1 − bounce`). A Time | Physics segment switches
+  them, and each mode keeps its own edits across the toggle. Either mode resolves to a
+  `{ stiffness, damping, mass }` value so every consumer works without a motion runtime;
+  Time mode carries `visualDuration` / `bounce` alongside the resolved physics, and the mode
+  is inferred back from those keys — so presets / persistence round-trip. Authored as
+  `{ type: "spring", visualDuration, bounce }` (or an explicit `mode: "time" | "physics"`),
+  including via `[data-tw]` markup.
+- `panel.setMany({ key: v, "folder.child": w })` — a batch write that resolves each key
+  like `set()` (dotted paths, no-op / reserved / bad-path guards) but fires listeners and
+  persists **once** for the whole batch, where N separate `set()` calls would fire N times.
+- `panel.toJSON()` / `panel.fromJSON(state)` — whole-panel state as a plain JSON-safe object:
+  every control value **plus** UI state (which folders are collapsed, which tab is active),
+  decoupled from the localStorage preset system. Persist it however you like — a file, a
+  query-string share link, a server. `fromJSON` applies values where their path still exists
+  (missing keys skipped, like a preset load) then restores the folder/tab state, firing
+  listeners once. `JSON.stringify(panel)` goes through `toJSON` too, so the panel object is
+  safely stringifiable. The `PanelState` type is exported.
+
+### Changed
+- Folders now carry a hairline above the group (using the border token), so each folder
+  reads as a section under its own rule — clearer separation in panels that mix top-level
+  controls with grouped sections. The leading group in a container skips the rule (it has
+  the panel header's divider, or its parent folder's, above it already).
+
+### Fixed
+- A segmented control (the Off/On toggle, the spring's new mode switch) built inside a
+  non-default tab page measured its active pill while the page was `display:none`, leaving
+  the pill stranded at the left edge (0×0) until the next edit or resize. It now re-measures
+  on the tab-reveal `tw-reflow` event, the same hook the canvas controls already used.
+
 ## 0.1.0 — 2026-06-13
 
 First public release.

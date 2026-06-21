@@ -1,8 +1,8 @@
 // ── Image — drop-zone / file-pick → data URL. Lazy.
 import { el, btn, txt, registerControl } from "../shared.js";
 
-// ── Image — a drop-zone / file-pick that returns a data URL, with a thumbnail
-// (leva's image input). Drag an image on, or click to choose. ──
+// ── Image — a drop-zone / file-pick that returns a data URL, with a thumbnail.
+// Drag an image on, or click to choose. ──
 function createImage(meta, onChange) {
   let value = meta.value || "";
   const row = el("div", "tw-row tw-image-row");

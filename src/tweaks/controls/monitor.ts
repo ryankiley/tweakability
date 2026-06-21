@@ -1,7 +1,7 @@
 // ── Monitor + FPS graph — live sparkline / readout. Lazy; registers both types.
 import { el, txt, fitCanvas, accentColor, clamp, blade, registerControl } from "../shared.js";
 
-// ── FPS graph — a live monitor blade (Tweakpane's FpsGraph), zero deps ──
+// ── FPS graph — a live monitor blade, zero deps ──
 function createFps(meta) {
   const wrap = el("div", "tw-fps");
   const val = txt("span", "tw-fps-val", "—");
@@ -44,7 +44,7 @@ function createFps(meta) {
 // ── Monitor — poll any getter on an interval and show it: a number as a sparkline
 // (auto-ranged, or pinned with min/max) or a rolling readout, a string as a buffer
 // of the last few values. The FPS graph is the per-frame special case (createFps);
-// this is the general one (Tweakpane's graph/buffer monitor, leva's monitor()). ──
+// this is the general one — a graph/buffer monitor. ──
 function createMonitor(meta) {
   const get = typeof meta.get === "function" ? meta.get : () => meta.value;
   const interval = Math.max(30, Number.isFinite(+meta.interval) ? +meta.interval : 200); // a non-finite interval would make setInterval(…, NaN) a 0 ms busy-poll

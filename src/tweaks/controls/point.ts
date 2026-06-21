@@ -3,7 +3,7 @@ import { el, svgEl, numField, grabSurface, boxFrac, clamp, stepPrecision, popove
 
 // ── Point — a compact trigger row (label + value readout + a mini pad preview) that
 // opens the 2D pad over the component number fields in a portaled popover, the way the
-// colour control opens its picker (Tweakpane's point2d/3d/4d). The pad drives the first
+// colour control opens its picker. The pad drives the first
 // two components; the rest are field-only. Opt out of the pad with `pad: false`.
 // The component fields hold the values — everything else (readout, pad thumb, the
 // emitted map) reads off them, so there's one source of truth. ──

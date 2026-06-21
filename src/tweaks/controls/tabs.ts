@@ -2,8 +2,8 @@
 // after the module has loaded (ensured before the panel assembles).
 import { el, txt, onReady, measurePill, navIndex, registerControl } from "../shared.js";
 
-// ── Tabs — group controls into pages; a pill slides to the active tab (Tweakpane's
-// addTab / leva pages). Each page body is a .tw-controls that build() fills. ──
+// ── Tabs — group controls into pages; a pill slides to the active tab. Each page
+// body is a .tw-controls that build() fills. ──
 let tabsSeq = 0; // unique ids for the tab ↔ tabpanel aria pairing
 function createTabs(meta) {
   const uid = `tw-tabs-${++tabsSeq}`;
@@ -40,7 +40,8 @@ function createTabs(meta) {
     e.preventDefault(); activate(j); tabs[j].focus();
   });
   onReady(measure);
-  return { el: root, bodies };
+  // active()/activate() let the panel read + restore the selected tab (toJSON/fromJSON).
+  return { el: root, bodies, activate, active: () => tabs.findIndex((t) => t.dataset.active === "true") };
 }
 
 registerControl("tabs", createTabs);
