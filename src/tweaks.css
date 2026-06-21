@@ -67,11 +67,13 @@
    * continuous slider does, rather than each picking its own curve. --out is the
    * quick decelerate (chevrons, sliding pills); --spring is the slider's signature
    * organic settle (reveals, thumb scale-ups); --pop carries a hair of overshoot for
-   * press-releases that should feel springy. Reduced-motion neutralises them globally
-   * (see the transition kill-switch at the foot of the file). */
+   * press-releases that should feel springy; --inout is a symmetric ease for longer
+   * mechanical moves (the panel-body collapse, the toolbar icon swap + reset settle).
+   * Reduced-motion neutralises them globally (see the kill-switch at the foot of the file). */
   --tw-ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --tw-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --tw-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tw-ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
   /* --fold is a folder's open/shut settle: a normalised spring position-curve (the kit's
    * own spring tuner at visualDuration 0.35s, bounce 0.1) sampled into linear(). Unlike the
    * three eases above — all front-loaded ease-outs — a spring starts from rest, so the curve
@@ -218,7 +220,7 @@
 .tw-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
 
 /* Collapse — grid-rows 1fr→0fr animates the body height, dependency-free */
-.tw-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.25s var(--tw-ease-inout); }
 /* Clip the y-axis only (for the collapse) — overflow-x stays visible so a slider
  * rubber-banding past its end (up to MAX_STRETCH px) shows in the panel's 12px
  * padding rather than being clipped. Must be `clip`, not `hidden`: a `hidden` on
@@ -256,7 +258,7 @@
  * the raster to device pixels; at a fractional button position (a dragged panel, flex
  * subpixels) that demotion read as a ~1px icon shift after every copy/reset. */
 .tw-toolbar-btn__icons { position: relative; display: block; width: 14px; height: 14px; }
-.tw-toolbar-btn__icons svg { position: absolute; inset: 0; will-change: transform, filter; filter: blur(0); transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), filter 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-toolbar-btn__icons svg { position: absolute; inset: 0; will-change: transform, filter; filter: blur(0); transition: opacity 0.25s var(--tw-ease-inout), transform 0.25s var(--tw-ease-inout), filter 0.25s var(--tw-ease-inout); }
 .tw-toolbar-btn__check { opacity: 0; transform: scale(0.25); filter: blur(2px); color: var(--tw-success); }
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__copy { opacity: 0; transform: scale(0.25); filter: blur(2px); }
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__check { opacity: 1; transform: none; filter: blur(0); }
@@ -272,7 +274,7 @@
  * will-change keeps it on its compositor layer across hover/spin — same Safari fix. */
 .tw-toolbar-btn--reset svg { --tw-spin: 0deg; --tw-wind: 0deg; will-change: transform; transform: rotate(calc(var(--tw-spin) + var(--tw-wind))); transition: transform 0.34s cubic-bezier(0.34, 1.55, 0.5, 1); }
 .tw-toolbar-btn--reset:hover svg { --tw-wind: 22deg; }
-.tw-toolbar-btn--reset.is-spinning svg { transition-duration: 0.5s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-toolbar-btn--reset.is-spinning svg { transition-duration: 0.5s; transition-timing-function: var(--tw-ease-inout); }
 
 /* Focus rings — one accent ring, three insets, every focusable in the kit in one
  * place. Inset (−2): anything inside the controls stack, which is overflow:hidden
@@ -338,7 +340,7 @@
   position: absolute; top: 50%; left: 0; width: 3px; height: 20px;
   border-radius: 999px; background: var(--tw-text-primary);
   transform: translateY(-50%) scaleX(0.25); opacity: 0; pointer-events: none;
-  transition: opacity 0.15s, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.15s, transform 0.2s var(--tw-ease-spring);
 }
 /* Reveal on hover/focus too, at resting weight.
  * .is-hover is set in JS (pointerenter/leave) as a robust companion to :hover. */
