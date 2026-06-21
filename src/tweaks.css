@@ -43,11 +43,11 @@
   --tw-radius: 8px;
   --tw-row-height: 32px;
   --tw-shadow-dropdown: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
-  /* Container elevation — on dark, the readable cues are the 1px rim-light and the lit
-   * top edge (they separate the panel from the page where a black shadow can't), backed
-   * by a layered soft pool. -lifted deepens it while floating / being dragged. */
-  --tw-shadow-panel: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.5), 0 16px 32px -8px rgba(0, 0, 0, 0.6), 0 32px 64px -16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --tw-shadow-panel-lifted: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 6px 16px -3px rgba(0, 0, 0, 0.6), 0 36px 80px -18px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* Container elevation — a faint 1px rim-light separates the panel from the page (a black
+   * shadow alone can't on dark), backed by a soft, subdued pool (no lit top edge).
+   * -lifted deepens it a touch while floating / being dragged. */
+  --tw-shadow-panel: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 28px -8px rgba(0, 0, 0, 0.5), 0 18px 48px -16px rgba(0, 0, 0, 0.38);
+  --tw-shadow-panel-lifted: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 32px -8px rgba(0, 0, 0, 0.55), 0 28px 64px -16px rgba(0, 0, 0, 0.45);
   /* Success accent — the copy-confirmation check. Self-contained (no host --green-*
    * or color-scheme reliance); flips in the light-mode block below like every other
    * --tw-* colour, so the kit confirms in green wherever it's lifted. */
@@ -67,11 +67,19 @@
    * continuous slider does, rather than each picking its own curve. --out is the
    * quick decelerate (chevrons, sliding pills); --spring is the slider's signature
    * organic settle (reveals, thumb scale-ups); --pop carries a hair of overshoot for
-   * press-releases that should feel springy. Reduced-motion neutralises them globally
-   * (see the transition kill-switch at the foot of the file). */
+   * press-releases that should feel springy; --inout is a symmetric ease for longer
+   * mechanical moves (the panel-body collapse, the toolbar icon swap + reset settle).
+   * Reduced-motion neutralises them globally (see the kill-switch at the foot of the file). */
   --tw-ease-out: cubic-bezier(0.25, 1, 0.5, 1);
   --tw-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --tw-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tw-ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+  /* --fold is a folder's open/shut settle: a normalised spring position-curve (the kit's
+   * own spring tuner at visualDuration 0.35s, bounce 0.1) sampled into linear(). Unlike the
+   * three eases above — all front-loaded ease-outs — a spring starts from rest, so the curve
+   * is a soft S: the children dissolve gradually in lockstep with the height instead of
+   * blinking off in the first 60ms. Pairs with a 0.35s duration to let the full settle land. */
+  --tw-ease-fold: linear(0, 0.077, 0.237, 0.411, 0.570, 0.699, 0.797, 0.869, 0.918, 0.952, 0.973, 0.986, 0.994, 0.998, 1);
 
   font-family: var(--tw-font-sans);
   /* Pin the line-height the design's vertical metrics were built against. Buttons use
@@ -212,7 +220,7 @@
 .tw-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
 
 /* Collapse — grid-rows 1fr→0fr animates the body height, dependency-free */
-.tw-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.25s var(--tw-ease-inout); }
 /* Clip the y-axis only (for the collapse) — overflow-x stays visible so a slider
  * rubber-banding past its end (up to MAX_STRETCH px) shows in the panel's 12px
  * padding rather than being clipped. Must be `clip`, not `hidden`: a `hidden` on
@@ -250,7 +258,7 @@
  * the raster to device pixels; at a fractional button position (a dragged panel, flex
  * subpixels) that demotion read as a ~1px icon shift after every copy/reset. */
 .tw-toolbar-btn__icons { position: relative; display: block; width: 14px; height: 14px; }
-.tw-toolbar-btn__icons svg { position: absolute; inset: 0; will-change: transform, filter; filter: blur(0); transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), filter 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-toolbar-btn__icons svg { position: absolute; inset: 0; will-change: transform, filter; filter: blur(0); transition: opacity 0.25s var(--tw-ease-inout), transform 0.25s var(--tw-ease-inout), filter 0.25s var(--tw-ease-inout); }
 .tw-toolbar-btn__check { opacity: 0; transform: scale(0.25); filter: blur(2px); color: var(--tw-success); }
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__copy { opacity: 0; transform: scale(0.25); filter: blur(2px); }
 .tw-toolbar-btn--swap.is-copied .tw-toolbar-btn__check { opacity: 1; transform: none; filter: blur(0); }
@@ -266,7 +274,7 @@
  * will-change keeps it on its compositor layer across hover/spin — same Safari fix. */
 .tw-toolbar-btn--reset svg { --tw-spin: 0deg; --tw-wind: 0deg; will-change: transform; transform: rotate(calc(var(--tw-spin) + var(--tw-wind))); transition: transform 0.34s cubic-bezier(0.34, 1.55, 0.5, 1); }
 .tw-toolbar-btn--reset:hover svg { --tw-wind: 22deg; }
-.tw-toolbar-btn--reset.is-spinning svg { transition-duration: 0.5s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+.tw-toolbar-btn--reset.is-spinning svg { transition-duration: 0.5s; transition-timing-function: var(--tw-ease-inout); }
 
 /* Focus rings — one accent ring, three insets, every focusable in the kit in one
  * place. Inset (−2): anything inside the controls stack, which is overflow:hidden
@@ -332,7 +340,7 @@
   position: absolute; top: 50%; left: 0; width: 3px; height: 20px;
   border-radius: 999px; background: var(--tw-text-primary);
   transform: translateY(-50%) scaleX(0.25); opacity: 0; pointer-events: none;
-  transition: opacity 0.15s, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.15s, transform 0.2s var(--tw-ease-spring);
 }
 /* Reveal on hover/focus too, at resting weight.
  * .is-hover is set in JS (pointerenter/leave) as a robust companion to :hover. */
@@ -779,20 +787,37 @@
 .tw-folder-header:hover .tw-chevron { color: var(--tw-text-primary); }
 /* Same optical pull as the select chevron: its 15px box carries 3.75px of side-bearing,
  * so the glyph's visible edge lands at the title's 2px inset rather than ~5.75px in. */
-.tw-folder-header .tw-chevron { color: var(--tw-text-section); margin-right: -3.75px; }
-.tw-folder.is-collapsed .tw-folder-header .tw-chevron { transform: rotate(-90deg); }
-.tw-folder-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.26s cubic-bezier(0.22, 1, 0.36, 1); }
+/* The folder caret rides the body's own 0.35s --fold clock (not the shared 0.2s chevron
+ * transition), so it rotates in lockstep with the fade instead of snapping ~0.15s ahead. */
+.tw-folder-header .tw-chevron { color: var(--tw-text-section); margin-right: -3.75px; transition: transform 0.35s var(--tw-ease-fold), color 0.15s; }
+/* Collapsed caret flips to point up (open is the resting down-chevron) — an up/down toggle. */
+.tw-folder.is-collapsed .tw-folder-header .tw-chevron { transform: rotate(180deg); }
+/* contain: layout isolates the fold's per-frame track re-sizing (the subtree stays mounted +
+ * clipped, so it lays out every frame for 0.35s) from the rest of the panel. */
+.tw-folder-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.35s var(--tw-ease-fold); contain: layout; }
 .tw-folder.is-collapsed .tw-folder-body { grid-template-rows: 0fr; }
-/* Fade the nested controls as the folder collapses — animating height AND
- * opacity together, so the children dissolve rather than just unrolling. */
+/* Fade the nested controls as the folder collapses — height AND opacity share the
+ * same spring settle (--fold) over the same 0.35s, so the children dissolve in
+ * lockstep with the unrolling rather than blinking off ahead of it. */
 /* y-clip only (see .tw-body > .tw-controls) so a slider inside a folder can still
  * rubber-band past its end without the folder's collapse-clip cutting it off. */
 /* The row-height header already gives the top separation; the body just needs a little
  * room below its last control before the closing rule. */
-.tw-folder-body > .tw-controls { overflow-x: visible; overflow-y: clip; min-height: 0; padding-bottom: 8px; opacity: 1; transition: opacity 0.26s cubic-bezier(0.22, 1, 0.36, 1); }
+.tw-folder-body > .tw-controls { overflow-x: visible; overflow-y: clip; min-height: 0; padding-bottom: 8px; opacity: 1; transition: opacity 0.35s var(--tw-ease-fold), padding-bottom 0.35s var(--tw-ease-fold); }
 /* Collapse that padding too, so a collapsed group is exactly its header — the title sits
  * centred in its row between the two rules, matching the open state. */
 .tw-folder.is-collapsed .tw-folder-body > .tw-controls { opacity: 0; padding-bottom: 0; }
+/* That 8px only exists to clear the folder's bottom hairline. The last folder drops the
+ * hairline (border-bottom:none above), so the padding is redundant there — it would stack
+ * on the panel's own bottom padding as dead space. Drop it so a panel ending in a folder
+ * closes like one ending in a plain control (panel padding only). */
+.tw-folder:last-child .tw-folder-body > .tw-controls { padding-bottom: 0; }
+/* Hold each control at full height while the body collapses. The grid track constrains
+ * .tw-controls, and as a flex column it would otherwise shrink its rows to fit — they'd
+ * squash on collapse and stretch on open. flex-shrink:0 keeps every row at its natural
+ * size so the overflow-y:clip wipes them away top-down (and the opacity fades them) rather
+ * than deforming them — a clean dissolve, the way an animated auto-height would clip. */
+.tw-folder-body > .tw-controls > * { flex-shrink: 0; }
 
 /* ── Spring config — settle-curve preview + stiffness/damping/mass ── */
 .tw-spring { display: flex; flex-direction: column; gap: 8px; background: var(--tw-surface); border-radius: var(--tw-radius); padding: 8px; }
