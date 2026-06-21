@@ -48,7 +48,9 @@ export const examples = [
     prose: `<p>The panel is just another consumer of its own state:
       <code>panel.set(key, value)</code> moves a control programmatically (listeners
       fire, the UI follows), and <code>panel.reset()</code> restores every default —
-      the same thing the toolbar's reset button does.</p>`,
+      the same thing the toolbar's reset button does. To move several at once, hand
+      <code>panel.setMany({ key: v, "folder.child": w })</code> a flat map — it applies the
+      whole batch and notifies once, not once per key (the shuffle below sets two).</p>`,
     target: `
       <div class="pa-remote">
         <div class="pa-tile"></div>
@@ -82,10 +84,54 @@ export const examples = [
       apply(panel.params);
 
       target.querySelector(".pa-shuffle").addEventListener("click", () => {
-        panel.set("hue", Math.round(Math.random() * 360));
-        panel.set("lift", Math.round(Math.random() * 40));
+        panel.setMany({ hue: Math.round(Math.random() * 360), lift: Math.round(Math.random() * 40) });
       });
       target.querySelector(".pa-restore").addEventListener("click", () => panel.reset());
+    },
+  },
+  {
+    id: "save-load",
+    title: "Save & load state",
+    prose: `<p><code>panel.toJSON()</code> serializes the whole panel — every value
+      <strong>plus</strong> UI state (which folders are collapsed, which tab is open) — to a
+      plain object, separate from the localStorage presets. Persist it your own way: a file,
+      a URL, a server. <code>panel.fromJSON(state)</code> restores it (unknown paths skipped).
+      Tweak things, collapse the folder, <strong>Save</strong>, change more, then
+      <strong>Load</strong> to snap back.</p>`,
+    target: `
+      <div class="pa-save">
+        <div class="pa-save-row">
+          <button class="pa-btn pa-do-save" type="button">panel.toJSON()</button>
+          <button class="pa-btn pa-do-load" type="button">panel.fromJSON(…)</button>
+        </div>
+        <pre class="pa-state">— Save to capture state —</pre>
+      </div>`,
+    css: `
+      .pa-save { display: flex; flex-direction: column; gap: 10px; width: 100%; align-self: stretch; }
+      .pa-save-row { display: flex; gap: 8px; }
+      .pa-state { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--demo-well);
+                  border: 1px solid var(--demo-well-line); font-size: 11px; line-height: 1.6;
+                  color: var(--demo-well-ink); white-space: pre-wrap; max-height: 180px; overflow: auto; }`,
+    run: ({ tweaks, mount, target }) => {
+      const out = target.querySelector(".pa-state");
+      let saved = null;
+      const panel = tweaks("Card", {
+        blur: [12, 0, 40, 1],
+        accent: "#7C5CFF",
+        shadow: {
+          radius: [16, 0, 64, 1],
+          opacity: [0.4, 0, 1, 0.05],
+        },
+      });
+      mount.append(panel.el);
+
+      target.querySelector(".pa-do-save").addEventListener("click", () => {
+        saved = panel.toJSON();
+        out.textContent = JSON.stringify(saved, null, 2);
+      });
+      target.querySelector(".pa-do-load").addEventListener("click", () => {
+        if (saved) panel.fromJSON(saved);
+      });
     },
   },
   {

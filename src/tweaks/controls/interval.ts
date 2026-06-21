@@ -2,7 +2,7 @@
 import { el, txt, clamp, roundToStep, stepPrecision, inferStep, wireHoverClass, onReady, onLive, registerControl } from "../shared.js";
 
 // ── Interval / range slider — a dual-handle slider bound to [lo, hi] inside
-// [min, max] (Tweakpane-essentials' Interval; leva's `interval`). Reuses the
+// [min, max]. Reuses the
 // slider's track + fill + handle, so the range segment picks up the accent on
 // drag just like the single slider. Both handles are focusable role="slider"s. ──
 function createInterval(meta, onChange) {

@@ -15,7 +15,7 @@
 import {
   titleCase, clamp, isColorStr, stepPrecision, roundToStep, inferStep, defaultRange,
   optValue, optLabel, el, btn, txt, popover, placeBelow, closeActivePopover, stopPointerLeak, applyThemeVars, resolveTheme, carryScheme, carrySkin, onReady, onLive,
-  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, numField, blade, quietFocus, measurePill, REDUCE_MOTION,
+  wireHoverClass, fuzzyMatch, setRadioActive, radioButton, navIndex, createSegmented, numField, blade, quietFocus, measurePill, REDUCE_MOTION,
   registerControl, getControl,
 } from "./shared.js";
 import type { Schema, TweaksOptions, Panel, Params } from "./types.js";
@@ -108,7 +108,17 @@ const TYPED_META: Record<string, (v: any, key: string, label: string, depth?: nu
   text: (v, key, label) => ({ type: "text", key, label, value: v.value ?? "", rows: v.rows, placeholder: v.placeholder }),
   interval: (v, key, label) => { const mn = v.min ?? 0, mx = v.max ?? 1; return { type: "interval", key, label, value: (Array.isArray(v.value) ? v.value : [mn, mx]).map(Number), min: mn, max: mx, step: v.step ?? inferStep(mn, mx) }; },
   // The config reads off the top level or a nested `value: {…}` — both published forms.
-  spring: (v, key, label) => { const s = isObj(v.value) ? v.value : v; return { type: "spring", key, label, value: { stiffness: s.stiffness ?? 300, damping: s.damping ?? 26, mass: s.mass ?? 1 } }; },
+  // Physics (stiffness/damping/mass) is always normalised; the perceptual time pair
+  // (visualDuration/bounce) and an explicit mode ride along only when present, so the
+  // control can infer/restore the Time vs Physics mode.
+  spring: (v, key, label) => {
+    const s = isObj(v.value) ? v.value : v;
+    const value: any = { stiffness: s.stiffness ?? 300, damping: s.damping ?? 26, mass: s.mass ?? 1 };
+    if (Number.isFinite(+s.visualDuration)) value.visualDuration = +s.visualDuration;
+    if (Number.isFinite(+s.bounce)) value.bounce = +s.bounce;
+    const mode = v.mode ?? s.mode;
+    return { type: "spring", key, label, value, ...(mode === "time" || mode === "physics" ? { mode } : {}) };
+  },
   cubicbezier: (v, key, label) => ({ type: "cubicbezier", key, label, value: Array.isArray(v.value) && v.value.length === 4 ? v.value.map(Number) : [0.25, 0.1, 0.25, 1] }),
   point: (v, key, label) => Array.isArray(v.components) && { type: "point", key, label, components: v.components, pad: v.pad, invertY: v.invertY, value: Object.fromEntries(v.components.map((c) => [c.key, c.value ?? 0])) }, // `value` = the default component map, so reset() / double-click-reset can restore it
   gradient: (v, key, label) => ({ type: "gradient", key, label, value: v.value ?? v.stops ?? null }),
@@ -183,7 +193,7 @@ function baseMetaFor(key, value, depth = 0) {
   return null;
 }
 
-// ── Slider control (ported from Slider.tsx) ──
+// ── Slider control ──
 const CLICK_THRESHOLD = 3, DEAD_ZONE = 32, MAX_CURSOR_RANGE = 200, MAX_STRETCH = 8;
 function createSlider(meta, onChange) {
   const label = meta.label;
@@ -436,29 +446,6 @@ function createSlider(meta, onChange) {
   return { el: wrap, set: (v) => set(v, false), get: () => q(value) };
 }
 
-// ── Segmented control (ported from SegmentedControl.tsx) ──
-function createSegmented(options, value, onChange, ariaLabel) {
-  const seg = el("div", "tw-seg"); seg.setAttribute("role", "radiogroup");
-  if (ariaLabel) seg.setAttribute("aria-label", ariaLabel);
-  const pill = el("div", "tw-seg-pill");
-  seg.append(pill);
-  const btns = options.map((o) => { const b = radioButton("tw-seg-btn", o, (v) => set(v)); seg.append(b); return b; }); // lazy `set` — it's declared below
-  // Fill the active segment; the 2px flex gap + 2px container padding frame it. The liquid
-  // pill (a transient scaleX overshoot, trailing-edge origin) rides on a real move — shared
-  // with tabs via measurePill (reduced-motion skips the stretch).
-  const measure = (animate?) => measurePill(seg, pill, animate);
-  const reflect = () => { setRadioActive(btns, value); measure(true); };
-  const set = (v, fire = true) => { value = v; reflect(); if (fire) onChange(v); };
-  seg.addEventListener("keydown", (e) => {
-    const i = btns.findIndex((b) => b.dataset.value === String(value)); if (i < 0) return;
-    const j = navIndex(e.key, i, btns.length); if (j < 0) return;
-    e.preventDefault(); set(btns[j]._twVal); btns[j].focus(); // _twVal, not dataset.value — the keyboard pick must emit the option's real (possibly non-string) value
-  });
-  reflect();
-  onReady(() => { measure(); seg.classList.add("is-ready"); }); // measure once laid out, again when fonts land (re-adding is-ready is a no-op)
-  return { el: seg, set: (v) => set(v, false), get: () => value };
-}
-
 function createToggle(meta, onChange) {
   const row = el("div", "tw-row");
   // A boolean, shown as a two-segment Off/On pill that slides — the segmented control
@@ -493,7 +480,7 @@ function createRadiogrid(meta, onChange) {
   return { el: row, set: (v) => set(v, false), get: () => value };
 }
 
-// ── Select (ported from SelectControl.tsx) ──
+// ── Select ──
 const CHEVRON = `<svg class="tw-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
 function createSelect(meta, onChange) {
   let value = meta.value;
@@ -550,8 +537,8 @@ function createButton(meta) {
   return blade(b);
 }
 
-// ── Button group — a row of compact actions under one label (leva's buttonGroup),
-// the action sibling to the radio grid. `buttons` is { label: fn } or [{label, action}]. ──
+// ── Button group — a row of compact actions under one label, the action sibling
+// to the radio grid. `buttons` is { label: fn } or [{label, action}]. ──
 function createButtonGroup(meta) {
   const row = el("div", "tw-row tw-buttongroup");
   if (meta.label) row.append(txt("span", "tw-row-label", meta.label));
@@ -569,10 +556,10 @@ function createButtonGroup(meta) {
 // ── Separator — a thin divider to break a long panel into sections. ──
 const createSeparator = () => blade(el("div", "tw-separator"));
 
-// ── String — a labelled text input (ported from TextControl.tsx) ──
+// ── String — a labelled text input ──
 function createString(meta, onChange) {
   let value = meta.value ?? "";
-  // `rows` makes it a multiline textarea (Tweakpane #386 / leva's `rows`): the row
+  // `rows` makes it a multiline textarea: the row
   // grows to fit and aligns its label to the top instead of centring.
   const multi = meta.rows > 0;
   const row = el("div", multi ? "tw-row tw-row-multiline" : "tw-row");
@@ -587,10 +574,10 @@ function createString(meta, onChange) {
 }
 
 // ── Number — the shared numField engine in its row chrome: a typeable field with a
-// Tweakpane-style grab handle (drag to scrub), min-anchored rounding, soft support. ──
+// grab handle (drag to scrub), min-anchored rounding, soft support. ──
 const createNumber = (meta, onChange) => numField({ ...meta, row: true }, onChange);
 
-// ── Folder — a collapsible titled group (Tweakpane folders). Returns its inner
+// ── Folder — a collapsible titled group. Returns its inner
 // container as `body` so the caller fills it; collapse reuses the grid-rows trick. ──
 function createFolder(meta) {
   const root = el("div", "tw-folder");
@@ -600,8 +587,10 @@ function createFolder(meta) {
   const body = el("div", "tw-folder-body");
   const inner = el("div", "tw-controls"); body.append(inner);
   root.append(header, body);
-  header.addEventListener("click", () => { const c = root.classList.toggle("is-collapsed"); header.setAttribute("aria-expanded", c ? "false" : "true"); });
-  return { el: root, body: inner };
+  const setCollapsed = (c) => { root.classList.toggle("is-collapsed", c); header.setAttribute("aria-expanded", c ? "false" : "true"); };
+  header.addEventListener("click", () => setCollapsed(!root.classList.contains("is-collapsed")));
+  // setCollapsed lets the panel read + restore the open/closed state (toJSON/fromJSON).
+  return { el: root, body: inner, setCollapsed };
 }
 
 // Display/action controls — they carry no value, so the panel build skips the
@@ -788,13 +777,20 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   const cleanups: Array<() => void> = []; // every global attachment (document/window listeners, pending timers) registers its release here for destroy()
   let destroyed = false; // flipped by destroy(): assemble() bails, the mutating API methods go silent
   let assembled = false; // flipped at the end of assemble() — set() queues until the controls exist
-  const preSets: Array<[string, any]> = []; // set() calls from the lazy window, replayed once assemble() has built the controls — a dotted/nested set before then used to warn-and-drop, and a bare nested key minted a top-level orphan while the control kept its default
+  const preSets: Array<[string | symbol, any]> = []; // set()/setMany()/fromJSON() calls from the lazy window, replayed once assemble() has built the controls — a dotted/nested set before then used to warn-and-drop, and a bare nested key minted a top-level orphan while the control kept its default
   let liftSlot = null; // the placeholder a lifted panel leaves in its host slot — removed on destroy()
   let persist = () => {}; // reassigned below when opts.persist is set (debounced localStorage save)
   // Assigned by assemble() below. Declared here so the API returned synchronously can
   // forward to them even on the lazy path, where assemble() runs after modules load.
   let listPresets: () => Record<string, any> = () => ({}), savePreset: (nm?: string) => boolean = () => false, loadPreset: (nm?: string) => boolean = () => false, deletePreset: (nm?: string) => void = () => {};
   let undo = () => {}, redo = () => {};
+  // Whole-panel state (toJSON/fromJSON). Reassigned in assemble() once the controls + the
+  // value/UI collectors exist; the stubs below cover the lazy window before ready — toJSON
+  // returns the live values (no UI state yet); fromJSON enqueues onto preSets (tagged), so it
+  // replays interleaved with set()/setMany() in call order, after the persist/preset restore.
+  const FROMJSON = Symbol("fromJSON"), SETMANY = Symbol("setMany");
+  let doToJSON: () => any = () => { const v = JSON.parse(JSON.stringify(params)); delete v._last; return { values: v, ui: {} }; };
+  let doFromJSON: (state: any) => void = (state) => { preSets.push([FROMJSON, state]); };
   // Each listener runs isolated: a throwing on() callback (or internal listener)
   // can't break the others, skip persist(), or bubble back out through set().
   const notify = () => { listeners.forEach((fn) => { try { fn(params, params._last); } catch (e) { console.error("[tweaks] listener threw:", e); } }); persist(); };
@@ -810,7 +806,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // demo stage that listens on window). The controls have handled them by now.
   stopPointerLeak(panel);
   const header = el("div", "tw-header");
-  // Tapping the title collapses the body (Tweakpane-style); the toolbar sits
+  // Tapping the title collapses the body; the toolbar sits
   // beside it and never triggers a collapse. No chevron — the title is the toggle.
   const titleBtn = btn("tw-header-toggle");
   titleBtn.setAttribute("aria-expanded", "true");
@@ -923,6 +919,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
     if (m.render || m.disabled != null) conditionals.push({ node, m });
   };
   const filterItems = [], filterFolders = []; // searchable index (opts.filter) keyed on each control's real label
+  const folderEls: any[] = [], tabsCtrls: any[] = []; // folder + tabs handles keyed by path — read/restored as UI state by toJSON/fromJSON
 
   // Build controls into a container, recursing into folders (nested params).
   const build = (container, ms, target, basePath = [], folderItem = null) => {
@@ -932,6 +929,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
         const makeTabs = getControl("tabs");
         const tabsCtrl = makeTabs && makeTabs(m);
         if (!tabsCtrl) continue; // tabs module ensured before assemble; skip if it failed to load
+        tabsCtrls.push({ path: [...basePath, m.key], ctrl: tabsCtrl, pageKeys: m.pages.map((p) => p.key) });
         m.pages.forEach((page, i) => { const psub = {}; subTrees.add(psub); sub[page.key] = psub; build(tabsCtrl.bodies[i], page.children, psub, [...basePath, m.key, page.key]); });
         registerCond(tabsCtrl.el, m); container.append(tabsCtrl.el);
         continue;
@@ -939,6 +937,7 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
       if (m.type === "folder") {
         const sub = {}; subTrees.add(sub); target[m.key] = sub;
         const f = createFolder(m);
+        folderEls.push({ path: [...basePath, m.key], el: f.el, setCollapsed: f.setCollapsed });
         const fi = filterOn ? { el: f.el, label: m.label, body: f.body } : null;
         if (fi) filterFolders.push(fi);
         build(f.body, m.children, sub, [...basePath, m.key], fi); registerCond(f.el, m); container.append(f.el);
@@ -1030,6 +1029,27 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   savePreset = (nm) => { if (!presetsKey || !nm) return false; const all = listPresets(); all[nm] = snapshot(); writeStore(presetsKey, all); return true; };
   loadPreset = (nm) => { const all = listPresets(); if (all[nm]) { applySnapshot(all[nm]); return true; } return false; };
   deletePreset = (nm) => { if (!presetsKey) return; const all = listPresets(); delete all[nm]; writeStore(presetsKey, all); };
+
+  // ── Whole-panel state (toJSON / fromJSON) ──────────────────────────────────
+  // Values via the same snapshot machinery as presets, PLUS UI state — folder
+  // open/closed and the active tab, keyed by dotted path. Decoupled from
+  // localStorage: the host persists the returned object however it likes (a file,
+  // a URL/share link, a server). fromJSON applies values where their path still
+  // exists (missing keys skipped, like a preset load) then restores the UI state.
+  const pathKey = (p) => p.map((k) => String(k).replace(/~/g, "~1").replace(/\./g, "~0")).join("."); // JSON-pointer-style escaping → injective: a literal "." in a key can't collide with the nesting separator (keys without dots stay readable)
+  const collectUI = () => {
+    const ui: any = {};
+    if (folderEls.length) { const f: any = {}; for (const fe of folderEls) f[pathKey(fe.path)] = fe.el.classList.contains("is-collapsed"); ui.folders = f; }
+    if (tabsCtrls.length) { const t: any = {}; for (const tc of tabsCtrls) t[pathKey(tc.path)] = tc.pageKeys[tc.ctrl.active()] ?? null; ui.tabs = t; }
+    return ui;
+  };
+  const applyUI = (ui) => {
+    if (!ui || typeof ui !== "object") return;
+    if (ui.folders) for (const fe of folderEls) { const c = ui.folders[pathKey(fe.path)]; if (typeof c === "boolean") fe.setCollapsed(c); }
+    if (ui.tabs) for (const tc of tabsCtrls) { const i = tc.pageKeys.indexOf(ui.tabs[pathKey(tc.path)]); if (i >= 0 && i !== tc.ctrl.active()) tc.ctrl.activate(i); } // skip re-activating the already-active tab — avoids a spurious tw-reflow on a no-op restore
+  };
+  doToJSON = () => ({ values: snapshot(), ui: collectUI() });
+  doFromJSON = (state) => { if (!state || typeof state !== "object") return; if (state.values) applySnapshot(state.values); applyUI(state.ui); }; // applySnapshot fires notify once; UI restore is silent (not a value change). A lazy-window fromJSON replays via its tagged preSets entry, in call order.
 
   // ── Repositioning — drag the header to move the panel ───────────────────────
   // Every panel is draggable by its header (opt out with opts.draggable:false). An
@@ -1228,45 +1248,80 @@ export function tweaks(name: string, schema: Schema, opts: TweaksOptions = {}): 
   // restore above, so an explicit host set() wins over a stored value the way it wins
   // over the schema default. Each replays through api.set, so paths resolve against
   // the real entries and listeners hear the changes.
-  for (const [k, v] of preSets.splice(0)) api.set(k, v);
+  for (const [k, v] of preSets.splice(0)) { if (k === FROMJSON) doFromJSON(v); else if (k === SETMANY) api.setMany(v); else api.set(k as string, v); } // tagged fromJSON/setMany entries replay through their assembled impls (one notify each); the shared queue preserves set/setMany/fromJSON call order
   for (const b of [copyBtn, resetBtn, presetsBtn, searchBtn]) if (b) b.disabled = false; // the toolbar's handlers are live now
   }; // end assemble
 
   // The API is built + returned synchronously. on/set/reset/setTheme operate on the
   // shell (live immediately); the presets + undo methods forward to bindings assemble()
   // fills in (no-ops until then — only reachable on the lazy path, before ready).
+  // One programmatic value write — resolve a (possibly dotted) key to its control or to a
+  // free bag key, apply it, and report whether the resolved leaf actually changed. The
+  // shared core of set()/setMany(): it never notifies, so a batch can fire one notify at
+  // the end (a set() loop would re-run every listener + persist per key).
+  const RESERVED = (p) => p === "__proto__" || p === "constructor" || p === "prototype";
+  const reservedKey = (key) => { if (String(key).split(".").some(RESERVED)) { console.warn(`[tweaks] set("${key}") ignored — reserved key`); return true; } return false; }; // params is an object-as-map; never write through to the prototype — shared by applySet + the lazy-window queue paths
+  const applySet = (key, v) => {
+    if (reservedKey(key)) return false;
+    const parts = String(key).split(".");
+    let e;
+    if (parts.length > 1) {
+      // Dotted path ("folder.child", "tabs.page.child") — walk the folder/tabs subtrees to
+      // the owning target, then match the leaf there.
+      let t: any = params;
+      for (let i = 0; i < parts.length - 1 && t; i++) { t = t[parts[i]]; if (!subTrees.has(t)) t = null; }
+      e = t && entries.find((x) => x.target === t && x.key === parts[parts.length - 1]);
+      if (!e) { console.warn(`[tweaks] set("${key}") — no control at that path`); return false; }
+    } else {
+      // Bare key — a unique match anywhere reaches nested controls without a path;
+      // ambiguity warns instead of guessing (and instead of minting an orphan top-level key).
+      const matches = entries.filter((x) => x.key === key);
+      if (matches.length > 1) { console.warn(`[tweaks] set("${key}") is ambiguous — ${matches.length} controls share that key; use a dotted path (e.g. "${matches[0].path.join(".")}")`); return false; }
+      e = matches[0];
+    }
+    const target = e ? e.target : params, leaf = e ? e.key : key;
+    const prev = target[leaf];
+    if (e) { e.set(v); target[leaf] = e.get(); }
+    else if (subTrees.has(params[key])) { console.warn(`[tweaks] set("${key}") ignored — it's a folder/tabs group; set its children instead`); return false; } // overwriting the subtree would silently orphan every child value
+    else params[key] = v; // bag passthrough — hosts park free keys on params
+    if (!valueChanged(prev, target[leaf])) return false; // a no-change set doesn't notify — the guard that keeps a store-sync listener from echoing forever
+    params._last = leaf; // stamp the changed key, so on((p, last)) sees programmatic sets the same as control edits
+    return true;
+  };
+
   const api: any = {
     el: panel, params,
     on(fn) { if (destroyed) return () => {}; listeners.add(fn); return () => listeners.delete(fn); },
     set(key, v) {
       if (destroyed) return;
-      const parts = String(key).split(".");
-      if (parts.some((p) => p === "__proto__" || p === "constructor" || p === "prototype")) return console.warn(`[tweaks] set("${key}") ignored — reserved key`); // params is an object-as-map; never write through to the prototype
-      if (!assembled) return void preSets.push([String(key), v]); // the lazy window (split build, before ready): the controls don't exist yet, so queue and let assemble() replay — resolving against the real entries instead of warning a nested path away or orphaning a bare key on params
-      let e;
-      if (parts.length > 1) {
-        // Dotted path ("folder.child", "tabs.page.child") — walk the folder/tabs
-        // subtrees to the owning target, then match the leaf there.
-        let t: any = params;
-        for (let i = 0; i < parts.length - 1 && t; i++) { t = t[parts[i]]; if (!subTrees.has(t)) t = null; }
-        e = t && entries.find((x) => x.target === t && x.key === parts[parts.length - 1]);
-        if (!e) return console.warn(`[tweaks] set("${key}") — no control at that path`);
-      } else {
-        // Bare key — a unique match anywhere reaches nested controls without a path;
-        // ambiguity warns instead of guessing (and instead of minting an orphan top-level key).
-        const matches = entries.filter((x) => x.key === key);
-        if (matches.length > 1) return console.warn(`[tweaks] set("${key}") is ambiguous — ${matches.length} controls share that key; use a dotted path (e.g. "${matches[0].path.join(".")}")`);
-        e = matches[0];
+      if (!assembled) { // the lazy window (split build, before ready): the controls don't exist yet, so queue and let assemble() replay — resolving against the real entries instead of warning a nested path away or orphaning a bare key on params
+        if (reservedKey(key)) return;
+        return void preSets.push([String(key), v]);
       }
-      const target = e ? e.target : params, leaf = e ? e.key : key;
-      const prev = target[leaf];
-      if (e) { e.set(v); target[leaf] = e.get(); }
-      else if (subTrees.has(params[key])) return console.warn(`[tweaks] set("${key}") ignored — it's a folder/tabs group; set its children instead`); // overwriting the subtree would silently orphan every child value
-      else params[key] = v; // bag passthrough — hosts park free keys on params
-      if (!valueChanged(prev, target[leaf])) return; // a no-change set doesn't notify — the guard that keeps a store-sync listener from echoing forever
-      params._last = leaf; notify(); // stamp the changed key, so on((p, last)) sees programmatic sets the same as control edits
+      if (applySet(key, v)) notify();
+    },
+    // Batch write — apply a flat map of (possibly dotted) keys, e.g.
+    // setMany({ "shadow.radius": 28, blur: 48 }), firing listeners + persist ONCE for the
+    // whole batch rather than per key as a set() loop would. Same path resolution and
+    // no-op / reserved / bad-path guards as set(); unrecognised keys warn-and-skip.
+    setMany(values) {
+      if (destroyed || values == null || typeof values !== "object") return;
+      if (!assembled) { // lazy window — queue the whole batch as ONE tagged entry, so it replays as a single setMany() (one notify), interleaved in call order with set()/fromJSON()
+        const filtered: any = {};
+        for (const k of Object.keys(values)) { if (!reservedKey(k)) filtered[k] = values[k]; }
+        preSets.push([SETMANY, filtered]);
+        return;
+      }
+      let changed = false;
+      for (const k of Object.keys(values)) { if (applySet(k, values[k])) changed = true; }
+      if (changed) notify();
     },
     reset() { if (!destroyed) resetBtn.click(); },
+    // Whole-panel state — values + UI (open folders, active tabs) as a plain JSON-safe
+    // object, independent of localStorage. `JSON.stringify(panel)` works too (this is the
+    // standard toJSON hook). fromJSON applies a previously-saved object back.
+    toJSON() { return destroyed ? { values: {}, ui: {} } : doToJSON(); },
+    fromJSON(state) { if (!destroyed) doFromJSON(state); },
     // Live theming — re-applies --tw-* vars to the panel (and future popovers). Clears
     // the prior theme first, so setTheme(null) reverts to the default monochrome look.
     setTheme(theme) { if (destroyed) return; if (themeVars) for (const k in themeVars) panel.style.removeProperty(k); themeVars = resolveTheme(theme); panel._twTheme = themeVars; applyThemeVars(panel, themeVars); window.dispatchEvent(new Event("tw-retheme")); },
@@ -1320,7 +1375,7 @@ const DATA_VALUE: Record<string, (d: any, host: any, label: string) => any> = {
   image: (d) => ({ value: d.value }),
   fpsgraph: (d) => ({ label: d.label || "FPS" }),
   interval: (d) => ({ value: d.value ? d.value.split(",").map(Number) : undefined, min: num(d.min), max: num(d.max), step: num(d.step) }),
-  spring: (d) => ({ stiffness: num(d.stiffness), damping: num(d.damping), mass: num(d.mass) }),
+  spring: (d) => ({ stiffness: num(d.stiffness), damping: num(d.damping), mass: num(d.mass), visualDuration: num(d.visualDuration), bounce: num(d.bounce), mode: d.mode }),
   cubicbezier: (d) => ({ value: d.value ? d.value.split(",").map(Number) : undefined }),
   point: (d) => {
     const vals = (d.value || "").split(",").map((s) => parseFloat(s));
@@ -1345,7 +1400,7 @@ const dataMeta = (host) => {
 };
 export async function enhance(root: Document | Element = document): Promise<void> {
   // Static showcase panels collapse like the real one: wrap the controls in a
-  // .tw-body and turn the header title into a collapse toggle (Tweakpane-style).
+  // .tw-body and turn the header title into a collapse toggle.
   // Panels built by tweaks() already nest controls in .tw-body, so they're skipped.
   root.querySelectorAll('.tw-panel[data-mode="inline"]:not([data-tw-panel-bound])').forEach((panel) => {
     const header = panel.querySelector(":scope > .tw-header");

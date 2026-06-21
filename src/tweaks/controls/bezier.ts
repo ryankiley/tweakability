@@ -1,9 +1,9 @@
 // ── Cubic bezier — interactive easing-curve editor. Lazy.
 import { el, btn, svgEl, numField, dragGesture, clamp, onReady, onLive, registerControl } from "../shared.js";
 
-// ── Cubic bezier — an interactive curve editor (Tweakpane's plugin-essentials
-// CubicBezier): two draggable control points over a unit box, value [x1,y1,x2,y2]
-// like CSS cubic-bezier(). x is clamped to [0,1]; y may overshoot for bounce. ──
+// ── Cubic bezier — an interactive curve editor: two draggable control points over a
+// unit box, value [x1,y1,x2,y2] like CSS cubic-bezier(). x is clamped to [0,1]; y may
+// overshoot for bounce. ──
 function createBezier(meta, onChange) {
   const DEF = [0.25, 0.1, 0.25, 1];
   let v = Array.isArray(meta.value) && meta.value.length === 4 ? meta.value.map(Number) : DEF.slice();
@@ -43,8 +43,8 @@ function createBezier(meta, onChange) {
     h1.style.left = p1x + "px"; h1.style.top = p1y + "px"; h2.style.left = p2x + "px"; h2.style.top = p2y + "px";
   };
 
-  // editable value fields (X1, Y1, X2, Y2) — Tweakpane's "something like this":
-  // x clamps to [0,1], y is free to overshoot. Drag a handle and they update.
+  // editable value fields (X1, Y1, X2, Y2): x clamps to [0,1], y is free to
+  // overshoot. Drag a handle and they update.
   const SPECS = [{ label: "X1", i: 0, lo: 0, hi: 1 }, { label: "Y1", i: 1, lo: YMIN, hi: YMAX }, { label: "X2", i: 2, lo: 0, hi: 1 }, { label: "Y2", i: 3, lo: YMIN, hi: YMAX }];
   const flds = SPECS.map((sp) => {
     const fld = numField({ label: sp.label, value: v[sp.i], step: 0.01, min: sp.lo, max: sp.hi }, (val) => { v[sp.i] = val; drawGraph(); onChange(v.slice()); });

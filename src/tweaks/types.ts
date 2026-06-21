@@ -36,7 +36,7 @@ export type SchemaObject =
   | { type: "color"; value?: string; label?: string }
   | { type: "text"; value?: string; rows?: number; placeholder?: string }
   | { type: "interval"; value?: [number, number]; min?: number; max?: number; step?: number }
-  | { type: "spring"; stiffness?: number; damping?: number; mass?: number; value?: { stiffness?: number; damping?: number; mass?: number } }
+  | { type: "spring"; mode?: "time" | "physics"; visualDuration?: number; bounce?: number; stiffness?: number; damping?: number; mass?: number; value?: { visualDuration?: number; bounce?: number; stiffness?: number; damping?: number; mass?: number } }
   | { type: "cubicbezier"; value?: [number, number, number, number] }
   | { type: "point"; components: Array<{ key: string; label?: string; value?: number; min?: number; max?: number; step?: number }>; pad?: boolean; invertY?: boolean }
   | { type: "gradient"; value?: { stops: GradientStop[]; interpolation?: GradientInterpolation } | Array<GradientStop | [string, number]> }
@@ -127,6 +127,27 @@ export interface TweaksOptions {
 /** The live values bag — `params[key]` for each control; `_last` is the last-changed key. */
 export type Params = Record<string, any> & { _last?: string };
 
+/** The whole-panel state `toJSON()` returns / `fromJSON()` accepts: every control value
+ *  (nested to mirror folders/tabs) plus UI state — which folders are collapsed and which
+ *  tab is active. JSON-safe; persist it however you like. Both `values` and `ui` are
+ *  optional on the way in, so `fromJSON({ values })` restores values only and
+ *  `fromJSON({ ui })` restores chrome only. (Panel collapse + floating position are not
+ *  captured — position has its own `opts.persist` channel.) */
+export interface PanelState {
+  /** Every control value, **nested** to mirror folders/tabs (e.g. `{ shadow: { radius: 16 } }`)
+   *  — not the dotted form `set()`/`setMany()` take. `fromJSON` matches by that nested path and
+   *  skips keys with no matching control. Normally you pass back what `toJSON()` produced. */
+  values?: Record<string, any>;
+  ui?: {
+    /** Folder collapse state → `true` when collapsed. Keys are the folder's path with each
+     *  segment JSON-pointer-escaped (`.`→`~0`, `~`→`~1`) then joined by `.` — injective, so a
+     *  literal dot in a key can't collide with the nesting separator. Treat keys as opaque. */
+    folders?: Record<string, boolean>;
+    /** Active tab → the active page's key, under the tabs control's path (escaped as above). */
+    tabs?: Record<string, string | null>;
+  };
+}
+
 /** The panel object `tweaks()` returns. */
 export interface Panel {
   /** The panel root element — append it to the DOM. */
@@ -141,8 +162,25 @@ export interface Panel {
    *  ("folder.child", "tabs.page.child"); a bare key also reaches a nested control
    *  when it's unambiguous. A key matching no control is stored on `params` as-is. */
   set(key: string, value: unknown): void;
+  /** Set several controls at once — a flat map of keys (dotted for nested controls), e.g.
+   *  `setMany({ "shadow.radius": 28, blur: 48 })`. Resolves each key like `set()`, then fires
+   *  listeners + persists ONCE for the whole batch, where N separate `set()` calls would fire
+   *  N times. Unknown / ambiguous / reserved keys warn and are skipped. */
+  setMany(values: Record<string, unknown>): void;
   /** Reset every control to its default (or run `opts.onReset`). */
   reset(): void;
+  /** Serialize the whole panel — every control value plus UI state (collapsed folders,
+   *  active tabs) — to a plain JSON-safe object, independent of localStorage/presets. Hand
+   *  it to your own storage: a file, a query string / share link, a server. `JSON.stringify`
+   *  on the panel calls this too. Most meaningful once `ready` (lazy controls have built). */
+  toJSON(): PanelState;
+  /** Restore a panel from a `toJSON()` object: values are applied where their path still
+   *  exists (missing ones skipped, like loading a preset), then folder/tab UI state. Fires
+   *  listeners once. Both halves are optional — pass `{ values }` to restore values only, or
+   *  `{ ui }` to restore chrome only. The value restore is undoable (one history step); the
+   *  UI restore is intentionally outside undo, so a Cmd-Z reverts values without thrashing
+   *  folders/tabs. */
+  fromJSON(state: PanelState): void;
   /** Re-theme the panel live; `null` reverts to the default. */
   setTheme(theme?: Theme | null): void;
   /** Save the current values as a named preset (needs `opts.persist`). */
